@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimCompanies Advisor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+  <div class="hlogo" id="hLogo">&#127981;</div>
+  <div>
+    <div class="hname" id="hName">SimCompanies Advisor</div>
+    <div class="hmeta" id="hMeta">Loading…</div>
+  </div>
+  <div class="hcash" id="hCash"></div>
+  <button class="btn" id="refreshBtn">&#8635; Refresh</button>
+</div>
+
+<div class="sbar">
+  <div class="spin" id="spin"></div>
+  <span id="stext">Initializing…</span>
+  <span class="sbar-right" id="sright"></span>
+</div>
+
+<div class="main">
+  <div id="errBox"></div>
+
+  <!-- Financial Snapshot -->
+  <div class="card" id="finCard" style="display:none">
+    <div class="card-head">
+      <span class="card-title">Financial Snapshot</span>
+      <span class="card-sub" id="finPeriod"></span>
+    </div>
+    <div class="fin-grid" id="finGrid"></div>
+    <div id="txnWrap"></div>
+  </div>
+
+  <!-- Surplus -->
+  <div class="card" id="surCard" style="display:none">
+    <div class="sec-head">
+      <span class="dot dot-g"></span>
+      <span class="sec-title">Surplus</span>
+      <span class="badge" id="surCount">0</span>
+      <div class="sort-wrap">
+        <span>Sort:</span>
+        <button class="sbtn" id="ss-net"      data-sort data-tbl="s" data-col="net"      data-dir="desc">Net Balance</button>
+        <button class="sbtn" id="ss-name"     data-sort data-tbl="s" data-col="name"     data-dir="asc">Name</button>
+        <button class="sbtn active" id="ss-val" data-sort data-tbl="s" data-col="mv"     data-dir="desc">Market Value</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-sort-tbl="s" data-sort-col="name">Resource</th>
+            <th class="num" data-sort-tbl="s" data-sort-col="produced">Produced/Day</th>
+            <th class="num" data-sort-tbl="s" data-sort-col="consumed">Consumed/Day</th>
+            <th class="num" data-sort-tbl="s" data-sort-col="net">Net Balance/Day</th>
+            <th class="num" data-sort-tbl="s" data-sort-col="mv">Market Value/Day</th>
+          </tr>
+        </thead>
+        <tbody id="surTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Deficit -->
+  <div class="card" id="defCard" style="display:none">
+    <div class="sec-head">
+      <span class="dot dot-a"></span>
+      <span class="sec-title">Deficit</span>
+      <span class="badge" id="defCount">0</span>
+      <div class="sort-wrap">
+        <span>Sort:</span>
+        <button class="sbtn active" id="ds-net"  data-sort data-tbl="d" data-col="net"     data-dir="asc">Net Balance</button>
+        <button class="sbtn"        id="ds-name" data-sort data-tbl="d" data-col="name"    data-dir="asc">Name</button>
+        <button class="sbtn"        id="ds-buy"  data-sort data-tbl="d" data-col="buyCost" data-dir="desc">Buy Cost</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:20px"></th>
+            <th data-sort-tbl="d" data-sort-col="name">Resource</th>
+            <th class="num" data-sort-tbl="d" data-sort-col="produced">Produced/Day</th>
+            <th class="num" data-sort-tbl="d" data-sort-col="consumed">Consumed/Day</th>
+            <th class="num" data-sort-tbl="d" data-sort-col="net">Net/Day</th>
+            <th class="num" data-sort-tbl="d" data-sort-col="buyCost">Buy Cost/Day</th>
+            <th data-sort-tbl="d" data-sort-col="rec">Recommendation</th>
+          </tr>
+        </thead>
+        <tbody id="defTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
