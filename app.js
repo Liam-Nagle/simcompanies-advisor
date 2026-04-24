@@ -629,7 +629,7 @@ function renderSurplus() {
       <td class="num">${fmtN(r.produced)}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--green)">+${fmtN(r.net)}</td>
-      <td class="num" style="color:var(--gold)">${fmtSC(r.mv)} SC</td>
+      <td class="num" style="color:var(--gold)">${fmtSC(r.mv)}</td>
     </tr>`).join('');
 }
 
@@ -654,7 +654,7 @@ function renderDeficit() {
       <td class="num">${r.produced > 0.001 ? fmtN(r.produced) : '—'}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--amber)">${fmtN(r.net)}</td>
-      <td class="num">${fmtSC(r.buyCost)} SC/day</td>
+      <td class="num">${fmtSC(r.buyCost)}/day</td>
       <td>${chipHtml}</td>
     </tr>
     <tr class="detail-tr hide" id="det${i}">
@@ -672,31 +672,31 @@ function mvbDetail(r) {
     <div class="mvb-grid">
       <div class="mvb-box ${buyWins ? 'win' : ''}">
         <div class="mvb-lbl">${buyWins ? '&#10003; ' : ''}Buy from Market</div>
-        <div class="mvb-cost">${fmtSC(m.buyTotal)} SC/day</div>
-        <div class="mvb-break">${fmtSC(m.buyCPU)} SC/unit &times; ${fmtN(m.deficitPerDay)} units/day</div>
+        <div class="mvb-cost">${fmtSC(m.buyTotal)}/day</div>
+        <div class="mvb-break">${fmtSC(m.buyCPU)}/unit &times; ${fmtN(m.deficitPerDay)} units/day</div>
       </div>
       <div class="mvb-box ${!buyWins ? 'win2' : ''}">
         <div class="mvb-lbl">${!buyWins ? '&#10003; ' : ''}Produce in ${esc(m.bldName)}</div>
-        <div class="mvb-cost">${fmtSC(m.makeTotal)} SC/day</div>
+        <div class="mvb-cost">${fmtSC(m.makeTotal)}/day</div>
         <div class="mvb-break">
-          ${fmtSC(m.makeCPU)} SC/unit total<br>
-          Wages: ${fmtSC(m.wageCPU)} SC/unit<br>
-          Materials: ${fmtSC(m.matCPU)} SC/unit
+          ${fmtSC(m.makeCPU)}/unit total<br>
+          Wages: ${fmtSC(m.wageCPU)}/unit<br>
+          Materials: ${fmtSC(m.matCPU)}/unit
         </div>
         ${!buyWins ? `<div class="ao-warn">&#9888; Adding a ${esc(m.bldName)} increases admin overhead</div>` : ''}
       </div>
       <div class="mvb-box">
         <div class="mvb-lbl">Daily Saving</div>
         <div class="mvb-cost" style="color:${buyWins ? 'var(--green)' : 'var(--amber)'}">
-          ${fmtSC(m.saving)} SC/day
+          ${fmtSC(m.saving)}/day
         </div>
         <div class="mvb-break">${buyWins ? 'Buying is cheaper' : 'Producing is cheaper'}</div>
       </div>
     </div>
     <div class="detail-note">
       Deficit: ${fmtN(m.deficitPerDay)}/day &nbsp;&middot;&nbsp;
-      Market: ${fmtSC(m.buyCPU)} SC/unit &nbsp;&middot;&nbsp;
-      Make cost: ${fmtSC(m.makeCPU)} SC/unit
+      Market: ${fmtSC(m.buyCPU)}/unit &nbsp;&middot;&nbsp;
+      Make cost: ${fmtSC(m.makeCPU)}/unit
     </div>
   </div>`;
 }
@@ -746,7 +746,7 @@ function updateSummary() {
     `${playerBuildings.length} building${playerBuildings.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; ` +
     `${surRows.length} surplus &nbsp;&middot;&nbsp; ` +
     `${defRows.length} deficit &nbsp;&middot;&nbsp; ` +
-    `Net: <span style="color:${netColor};font-weight:600">${net >= 0 ? '+' : ''}${fmtSC(net)} SC/day</span>`;
+    `Net: <span style="color:${netColor};font-weight:600">${net >= 0 ? '+' : ''}${fmtSC(net)}/day</span>`;
   document.getElementById('spin').style.display = 'none';
   if (tickerAge !== null) {
     const mins = Math.ceil(tickerAge / 60);
@@ -869,7 +869,7 @@ function renderFinancials(bal, inc, cf) {
   if (items.length) {
     gridHtml = `<div class="fin-grid">${items.map(i =>
       `<div class="fin-item"><div class="fin-lbl">${i.lbl}</div>
-       <div class="fin-val ${i.cls}">${i.val}<span class="unit">SC</span></div></div>`
+       <div class="fin-val ${i.cls}">${i.val}</div></div>`
     ).join('')}</div>`;
   }
 
@@ -879,7 +879,7 @@ function renderFinancials(bal, inc, cf) {
       const amt = t.amount != null ? t.amount : (t.change || 0);
       return `<div class="txn">
         <span>${esc(t.description || t.type || 'Transaction')}</span>
-        <span class="txn-amt ${amt >= 0 ? 'pos' : 'neg'}">${amt >= 0 ? '+' : ''}${fmtSC(amt)} SC</span>
+        <span class="txn-amt ${amt >= 0 ? 'pos' : 'neg'}">${amt >= 0 ? '+' : ''}${fmtSC(amt)}</span>
       </div>`;
     }).join('');
     txnHtml = `<div class="txn-wrap"><div class="txn-label">Recent Transactions</div>${rows}</div>`;
@@ -913,10 +913,11 @@ function fmtN(n, dp = 1) {
 function fmtSC(n) {
   if (n == null || isNaN(n)) return '—';
   const a = Math.abs(n);
-  if (a >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-  if (a >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (a >= 1e3) return (n / 1e3).toFixed(1) + 'k';
-  return n.toFixed(2);
+  const s = n < 0 ? '-' : '';
+  if (a >= 1e9) return s + '$' + (a / 1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return s + '$' + (a / 1e6).toFixed(2) + 'M';
+  if (a >= 1e3) return s + '$' + (a / 1e3).toFixed(1) + 'k';
+  return s + '$' + a.toFixed(2);
 }
 function esc(s) {
   return String(s || '')
