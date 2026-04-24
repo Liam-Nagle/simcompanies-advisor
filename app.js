@@ -156,43 +156,51 @@ const PROD = {
  145: {n:'Recipes',                pph:3.81,    i:[]},
 };
 
+// maxLvl derived from images arrays in the SimCompanies encyclopedia
 const BLDS = [
-  {k:'E', n:'Power Plant',                  w:414,   c:'production', o:[1]},
-  {k:'W', n:'Water Reservoir',              w:345,   c:'production', o:[2]},
-  {k:'P', n:'Plantation',                   w:103.5, c:'production', o:[3,4,5,6,40,66,72,106,118,120,136]},
-  {k:'F', n:'Farm',                         w:138,   c:'production', o:[9,46,115,116,117]},
-  {k:'M', n:'Mine',                         w:276,   c:'production', o:[14,15,68,42]},
-  {k:'O', n:'Oil Rig',                      w:517.5, c:'production', o:[10,74]},
-  {k:'Q', n:'Quarry',                       w:276,   c:'production', o:[44,104,105]},
-  {k:'S', n:'Shipping Depot',               w:310.5, c:'production', o:[13]},
-  {k:'Y', n:'Factory',                      w:414,   c:'production', o:[16,17,18,69,43,45,76,67]},
-  {k:'R', n:'Refinery',                     w:483,   c:'production', o:[11,12,19,75,83]},
-  {k:'L', n:'Electronics Factory',          w:379.5, c:'production', o:[20,21,22,23,24,25,26,27,28,114,47,79]},
-  {k:'T', n:'Fashion Factory',              w:138,   c:'production', o:[41,60,61,62,63,64,65,70,71]},
-  {k:'1', n:'Car Factory',                  w:448.5, c:'production', o:[49,50,51,53,54,55,56,57,112]},
-  {k:'D', n:'Propulsion Factory',           w:621,   c:'production', o:[48,52,85,86,88,89]},
-  {k:'7', n:'Aerospace Factory',            w:586.5, c:'production', o:[77,78,84,87,90,92,93]},
-  {k:'8', n:'Aerospace Electronics',        w:724.5, c:'production', o:[80,81,82,98,99]},
-  {k:'9', n:'Vertical Integration Facility',w:759,   c:'production', o:[91,94]},
-  {k:'0', n:'Hangar',                       w:759,   c:'production', o:[95,96,97]},
-  {k:'o', n:'Concrete Plant',               w:379.5, c:'production', o:[101,102,103]},
-  {k:'x', n:'Construction Factory',         w:483,   c:'production', o:[107,108,109,110]},
-  {k:'g', n:'General Contractor',           w:345,   c:'production', o:[111]},
-  {k:'e', n:'Slaughterhouse',               w:414,   c:'production', o:[7,8]},
-  {k:'i', n:'Mill',                         w:379.5, c:'production', o:[119,133,139]},
-  {k:'j', n:'Bakery',                       w:448.5, c:'production', o:[137,121,123]},
-  {k:'m', n:'Catering',                     w:655.5, c:'production', o:[138,129,130,131,142,132,143]},
-  {k:'k', n:'Food Processing Plant',        w:379.5, c:'production', o:[141,128,134,122,135,127,140]},
-  {k:'6', n:'Beverage Factory',             w:241.5, c:'production', o:[73,124,125,126]},
-  {k:'p', n:'Plant Research Center',        w:448.5, c:'research',   o:[29]},
-  {k:'h', n:'Physics Laboratory',           w:586.5, c:'research',   o:[30,31,32]},
-  {k:'b', n:'Breeding Laboratory',          w:414,   c:'research',   o:[33]},
-  {k:'c', n:'Chemistry Laboratory',         w:414,   c:'research',   o:[34,113]},
-  {k:'a', n:'Automotive R&D',               w:552,   c:'research',   o:[58]},
-  {k:'f', n:'Fashion & Design',             w:448.5, c:'research',   o:[59]},
-  {k:'s', n:'Software R&D',                 w:448.5, c:'research',   o:[35]},
-  {k:'l', n:'Launch Pad',                   w:724.5, c:'research',   o:[100]},
-  {k:'q', n:'Kitchen',                      w:517.5, c:'research',   o:[145]},
+  {k:'E', n:'Power Plant',                  w:414,   c:'production', maxLvl:2, o:[1]},
+  {k:'W', n:'Water Reservoir',              w:345,   c:'production', maxLvl:2, o:[2]},
+  {k:'P', n:'Plantation',                   w:103.5, c:'production', maxLvl:3, o:[3,4,5,6,40,66,72,106,118,120,136]},
+  {k:'F', n:'Farm',                         w:138,   c:'production', maxLvl:2, o:[9,46,115,116,117]},
+  {k:'M', n:'Mine',                         w:276,   c:'production', maxLvl:2, o:[14,15,68,42]},
+  {k:'O', n:'Oil Rig',                      w:517.5, c:'production', maxLvl:2, o:[10,74]},
+  {k:'Q', n:'Quarry',                       w:276,   c:'production', maxLvl:4, o:[44,104,105]},
+  {k:'S', n:'Shipping Depot',               w:310.5, c:'production', maxLvl:2, o:[13]},
+  {k:'Y', n:'Factory',                      w:414,   c:'production', maxLvl:2, o:[16,17,18,69,43,45,76,67]},
+  {k:'R', n:'Refinery',                     w:483,   c:'production', maxLvl:2, o:[11,12,19,75,83]},
+  {k:'L', n:'Electronics Factory',          w:379.5, c:'production', maxLvl:3, o:[20,21,22,23,24,25,26,27,28,114,47,79]},
+  {k:'T', n:'Fashion Factory',              w:138,   c:'production', maxLvl:2, o:[41,60,61,62,63,64,65,70,71]},
+  {k:'1', n:'Car Factory',                  w:448.5, c:'production', maxLvl:2, o:[49,50,51,53,54,55,56,57,112]},
+  {k:'D', n:'Propulsion Factory',           w:621,   c:'production', maxLvl:3, o:[48,52,85,86,88,89]},
+  {k:'7', n:'Aerospace Factory',            w:586.5, c:'production', maxLvl:3, o:[77,78,84,87,90,92,93]},
+  {k:'8', n:'Aerospace Electronics',        w:724.5, c:'production', maxLvl:3, o:[80,81,82,98,99]},
+  {k:'9', n:'Vertical Integration Facility',w:759,   c:'production', maxLvl:3, o:[91,94]},
+  {k:'0', n:'Hangar',                       w:759,   c:'production', maxLvl:3, o:[95,96,97]},
+  {k:'o', n:'Concrete Plant',               w:379.5, c:'production', maxLvl:3, o:[101,102,103]},
+  {k:'x', n:'Construction Factory',         w:483,   c:'production', maxLvl:4, o:[107,108,109,110]},
+  {k:'g', n:'General Contractor',           w:345,   c:'production', maxLvl:3, o:[111]},
+  {k:'e', n:'Slaughterhouse',               w:414,   c:'production', maxLvl:3, o:[7,8]},
+  {k:'i', n:'Mill',                         w:379.5, c:'production', maxLvl:3, o:[119,133,139]},
+  {k:'j', n:'Bakery',                       w:448.5, c:'production', maxLvl:3, o:[137,121,123]},
+  {k:'m', n:'Catering',                     w:655.5, c:'production', maxLvl:3, o:[138,129,130,131,142,132,143]},
+  {k:'k', n:'Food Processing Plant',        w:379.5, c:'production', maxLvl:3, o:[141,128,134,122,135,127,140]},
+  {k:'6', n:'Beverage Factory',             w:241.5, c:'production', maxLvl:3, o:[73,124,125,126]},
+  {k:'p', n:'Plant Research Center',        w:448.5, c:'research',   maxLvl:1, o:[29]},
+  {k:'h', n:'Physics Laboratory',           w:586.5, c:'research',   maxLvl:3, o:[30,31,32]},
+  {k:'b', n:'Breeding Laboratory',          w:414,   c:'research',   maxLvl:3, o:[33]},
+  {k:'c', n:'Chemistry Laboratory',         w:414,   c:'research',   maxLvl:3, o:[34,113]},
+  {k:'a', n:'Automotive R&D',               w:552,   c:'research',   maxLvl:3, o:[58]},
+  {k:'f', n:'Fashion & Design',             w:448.5, c:'research',   maxLvl:3, o:[59]},
+  {k:'s', n:'Software R&D',                 w:448.5, c:'research',   maxLvl:3, o:[35]},
+  {k:'l', n:'Launch Pad',                   w:724.5, c:'research',   maxLvl:3, o:[100]},
+  {k:'q', n:'Kitchen',                      w:517.5, c:'research',   maxLvl:3, o:[145]},
+  // Retail/sale buildings — rpph is estimated units sold per hour per level
+  {k:'G', n:'Grocery Store',     w:138,   c:'retail', maxLvl:3, rpph:100, o:[121,117,122,9,120,134,124,125,126,119,3,4,5,6,72]},
+  {k:'N', n:'Restaurant',        w:207,   c:'retail', maxLvl:3, rpph:10,  o:[129,127,130,131,132,142,143]},
+  {k:'C', n:'Clothing Store',    w:138,   c:'retail', maxLvl:3, rpph:30,  o:[60,61,62,63,64,65]},
+  {k:'U', n:'Electronics Store', w:207,   c:'retail', maxLvl:3, rpph:8,   o:[24,25,26,27,28]},
+  {k:'V', n:'Auto Dealership',   w:276,   c:'retail', maxLvl:3, rpph:2,   o:[55,56,53,54,57]},
+  {k:'B', n:'Jewelry Store',     w:172.5, c:'retail', maxLvl:3, rpph:5,   o:[70,71]},
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -299,28 +307,17 @@ function clearErr() { document.getElementById('errBox').innerHTML = ''; }
 function populateBldTypeDropdown() {
   const sel = document.getElementById('bldType');
   sel.innerHTML = '<option value="">— Select building —</option>';
-  const production = BLDS.filter(b => b.c === 'production');
-  const research   = BLDS.filter(b => b.c === 'research');
-
-  const grp1 = document.createElement('optgroup');
-  grp1.label = 'Production';
-  for (const b of production) {
-    const opt = document.createElement('option');
-    opt.value = b.k;
-    opt.textContent = b.n;
-    grp1.appendChild(opt);
+  for (const [label, cat] of [['Production','production'],['Retail / Sale','retail'],['Research','research']]) {
+    const grp = document.createElement('optgroup');
+    grp.label = label;
+    for (const b of BLDS.filter(x => x.c === cat)) {
+      const opt = document.createElement('option');
+      opt.value = b.k;
+      opt.textContent = b.n;
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
   }
-  sel.appendChild(grp1);
-
-  const grp2 = document.createElement('optgroup');
-  grp2.label = 'Research';
-  for (const b of research) {
-    const opt = document.createElement('option');
-    opt.value = b.k;
-    opt.textContent = b.n;
-    grp2.appendChild(opt);
-  }
-  sel.appendChild(grp2);
 }
 
 function updateProductDropdown(bldKind) {
@@ -340,13 +337,28 @@ function updateProductDropdown(bldKind) {
   if (bld.o.length === 1) sel.value = bld.o[0];
 }
 
+function updateLevelDropdown(bldKind) {
+  const sel = document.getElementById('bldLevel');
+  sel.innerHTML = '';
+  const bld = BLDS.find(b => b.k === bldKind);
+  const max = bld ? bld.maxLvl : 1;
+  for (let i = 1; i <= max; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `Lvl ${i}`;
+    sel.appendChild(opt);
+  }
+}
+
 document.getElementById('bldType').addEventListener('change', e => {
   updateProductDropdown(e.target.value);
+  updateLevelDropdown(e.target.value);
 });
 
 document.getElementById('addBldBtn').addEventListener('click', () => {
   const bk  = document.getElementById('bldType').value;
   const pk  = parseInt(document.getElementById('bldProduct').value);
+  const lvl = parseInt(document.getElementById('bldLevel').value) || 1;
   const qty = parseInt(document.getElementById('bldQty').value) || 1;
 
   if (!bk || !pk) {
@@ -355,12 +367,15 @@ document.getElementById('addBldBtn').addEventListener('click', () => {
   }
   document.getElementById('addBldError').textContent = '';
 
-  // Merge with existing same building+product entry
-  const existing = playerBuildings.find(e => e.bk === bk && e.pk === pk);
+  // Merge only if same building + product + level
+  const existing = playerBuildings.find(e => e.bk === bk && e.pk === pk && (e.lvl || 1) === lvl);
   if (existing) {
     existing.qty += qty;
   } else {
-    playerBuildings.push({ bk, pk, qty });
+    const bldDef = BLDS.find(b => b.k === bk);
+    const entry = { bk, pk, qty, lvl };
+    if (bldDef?.c === 'retail') entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
+    playerBuildings.push(entry);
   }
   savePlayerBuildings(playerBuildings);
   document.getElementById('bldQty').value = 1;
@@ -396,14 +411,36 @@ document.getElementById('bldTbody').addEventListener('click', e => {
 });
 
 document.getElementById('bldTbody').addEventListener('change', e => {
-  const inp = e.target.closest('[data-qty-idx]');
-  if (!inp) return;
-  const idx = parseInt(inp.dataset.qtyIdx);
-  const val = parseInt(inp.value) || 1;
-  if (val < 1) { inp.value = 1; return; }
-  playerBuildings[idx].qty = val;
-  savePlayerBuildings(playerBuildings);
-  recalculate();
+  const qtyInp = e.target.closest('[data-qty-idx]');
+  if (qtyInp) {
+    const idx = parseInt(qtyInp.dataset.qtyIdx);
+    const val = parseInt(qtyInp.value) || 1;
+    if (val < 1) { qtyInp.value = 1; return; }
+    playerBuildings[idx].qty = val;
+    savePlayerBuildings(playerBuildings);
+    recalculate();
+    return;
+  }
+  const lvlInp = e.target.closest('[data-lvl-idx]');
+  if (lvlInp) {
+    const idx = parseInt(lvlInp.dataset.lvlIdx);
+    const bld = BLDS.find(b => b.k === playerBuildings[idx].bk);
+    const max = bld ? bld.maxLvl : 1;
+    const val = Math.min(max, Math.max(1, parseInt(lvlInp.value) || 1));
+    lvlInp.value = val;
+    playerBuildings[idx].lvl = val;
+    savePlayerBuildings(playerBuildings);
+    recalculate();
+    return;
+  }
+  const rateInp = e.target.closest('[data-rate-idx]');
+  if (rateInp) {
+    const idx = parseInt(rateInp.dataset.rateIdx);
+    const val = Math.max(0, parseFloat(rateInp.value) || 0);
+    playerBuildings[idx].targetRate = val;
+    savePlayerBuildings(playerBuildings);
+    recalculate();
+  }
 });
 
 function renderBuildingList() {
@@ -412,24 +449,42 @@ function renderBuildingList() {
   count.textContent = playerBuildings.length;
 
   if (!playerBuildings.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);padding:14px 12px;font-size:12px">
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:14px 12px;font-size:12px">
       No buildings added yet. Use the form above to add your buildings.
     </td></tr>`;
     return;
   }
 
+  const ao = aoMultiplier(getAO());
   tbody.innerHTML = playerBuildings.map((e, i) => {
-    const bld  = BLDS.find(b => b.k === e.bk);
-    const prod = PROD[e.pk];
-    const ppd  = prod ? fmtN(prod.pph * e.qty * 24 * aoMultiplier(getAO())) : '—';
+    const bld      = BLDS.find(b => b.k === e.bk);
+    const prod     = PROD[e.pk];
+    const lvl      = e.lvl || 1;
+    const maxLvl   = bld?.maxLvl || 1;
+    const isRetail = bld?.c === 'retail';
+    let rateStr;
+    if (isRetail) {
+      const rate = e.targetRate != null ? e.targetRate : ((bld.rpph || 0) * lvl * 24);
+      rateStr = `<input type="number" class="qty-inp" value="${Math.round(rate)}" min="0"
+               data-rate-idx="${i}" title="Units sold per day per building — edit to match your in-game rate"
+               style="width:70px;background:var(--bg3);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
+               <span style="font-size:10px;color:var(--muted)">/day</span>`;
+    } else {
+      const ppd = prod ? prod.pph * lvl * e.qty * 24 * ao : 0;
+      rateStr = `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
+    }
     return `<tr>
-      <td><div class="res">${iconHtml(e.pk)}${esc(bld?.n || e.bk)}</div></td>
+      <td><div class="res">${iconHtml(e.pk)}${esc(bld?.n || e.bk)}${isRetail ? ' <span class="chip chip-buy" style="font-size:9px;padding:1px 5px">RETAIL</span>' : ''}</div></td>
       <td style="color:var(--text)">${esc(prod?.n || '?')}</td>
+      <td class="num">
+        <input type="number" class="qty-inp" value="${lvl}" min="1" max="${maxLvl}"
+               data-lvl-idx="${i}" style="width:44px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
+      </td>
       <td class="num">
         <input type="number" class="qty-inp" value="${e.qty}" min="1"
                data-qty-idx="${i}" style="width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
       </td>
-      <td class="num" style="color:var(--muted);font-size:11px">${ppd}/day</td>
+      <td class="num" style="font-size:11px">${rateStr}</td>
       <td style="text-align:right"><button class="sbtn" data-remove="${i}" title="Remove">&#10005;</button></td>
     </tr>`;
   }).join('');
@@ -461,12 +516,19 @@ function calculate() {
   for (const entry of playerBuildings) {
     const prod = PROD[+entry.pk];
     if (!prod) continue;
+    const bld = BLDS.find(b => b.k === entry.bk);
+    const lvl = entry.lvl || 1;
 
-    const unitsDay = prod.pph * entry.qty * 24 * ao;
-    produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
-
-    for (const inp of prod.i) {
-      consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
+    if (bld?.c === 'retail') {
+      const rate = entry.targetRate != null ? entry.targetRate : ((bld?.rpph || 0) * lvl * 24);
+      const demand = rate * entry.qty;
+      consumed[+entry.pk] = (consumed[+entry.pk] || 0) + demand;
+    } else {
+      const unitsDay = prod.pph * lvl * entry.qty * 24 * ao;
+      produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
+      for (const inp of prod.i) {
+        consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
+      }
     }
   }
 
