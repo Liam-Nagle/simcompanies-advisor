@@ -1,11 +1,18 @@
 'use strict';
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CONFIG
+   CONFIG  — update PROXY_URL after deploying to Render
 ───────────────────────────────────────────────────────────────────────────── */
-const BASE  = 'https://www.simcompanies.com';
-const REALM = 0;
-const TTL   = 5 * 60 * 1000; // 5 minutes
+const PROXY_URL = 'https://simcompanies-advisor.onrender.com'; // ← your Render URL
+const BASE      = 'https://www.simcompanies.com';              // for image src only
+const TTL       = 5 * 60 * 1000;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SESSION COOKIE  (stored in localStorage, sent as X-Sim-Cookie header)
+───────────────────────────────────────────────────────────────────────────── */
+function getStoredCookie() { return localStorage.getItem('sc_cookie') || ''; }
+function saveStoredCookie(v) { localStorage.setItem('sc_cookie', v.trim()); }
+function clearStoredCookie() { localStorage.removeItem('sc_cookie'); }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    CACHE  (localStorage, per-key TTL)
@@ -29,18 +36,22 @@ function cAge(k) {
   } catch { return null; }
 }
 function cClear() {
-  Object.keys(localStorage).filter(k => k.startsWith('sc_')).forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('sc_') && k !== 'sc_cookie')
+    .forEach(k => localStorage.removeItem(k));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   FETCH  (with cache + credentials)
+   FETCH via proxy
 ───────────────────────────────────────────────────────────────────────────── */
 async function apiFetch(path, cacheKey, force = false) {
   if (!force) {
     const hit = cGet(cacheKey);
     if (hit !== null) return hit;
   }
-  const res = await fetch(BASE + path, { credentials: 'include' });
+  const res = await fetch(PROXY_URL + path, {
+    headers: { 'X-Sim-Cookie': getStoredCookie() },
+  });
   if (res.status === 401 || res.status === 403) throw { type: 'auth', status: res.status, path };
   if (!res.ok) throw { type: 'http', status: res.status, path };
   const data = await res.json();
@@ -68,6 +79,46 @@ let defRows = [];
 const sortSt = { s: { col: 'net', dir: 'desc' }, d: { col: 'net', dir: 'asc' } };
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   SETUP MODAL
+───────────────────────────────────────────────────────────────────────────── */
+function showSetup(opts = {}) {
+  const modal = document.getElementById('setupModal');
+  if (opts.error) {
+    document.getElementById('setupError').textContent = opts.error;
+    document.getElementById('setupError').style.display = 'block';
+  } else {
+    document.getElementById('setupError').style.display = 'none';
+  }
+  modal.style.display = 'flex';
+  document.getElementById('cookieInput').focus();
+}
+function hideSetup() {
+  document.getElementById('setupModal').style.display = 'none';
+}
+
+document.getElementById('saveSessionBtn').addEventListener('click', () => {
+  const val = document.getElementById('cookieInput').value.trim();
+  if (!val) {
+    document.getElementById('setupError').textContent = 'Paste your cookie string first.';
+    document.getElementById('setupError').style.display = 'block';
+    return;
+  }
+  saveStoredCookie(val);
+  hideSetup();
+  loadAll(true);
+});
+
+document.getElementById('cookieInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('saveSessionBtn').click();
+});
+
+// Header "Update session" link
+document.getElementById('updateSessionBtn').addEventListener('click', () => {
+  document.getElementById('cookieInput').value = getStoredCookie();
+  showSetup();
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
    STATUS / ERROR
 ───────────────────────────────────────────────────────────────────────────── */
 function status(msg, loading) {
@@ -85,19 +136,20 @@ function clearErr() { document.getElementById('errBox').innerHTML = ''; }
    MAIN LOAD
 ───────────────────────────────────────────────────────────────────────────── */
 async function loadAll(force = false) {
+  // If no cookie stored, show setup first
+  if (!getStoredCookie()) { showSetup(); return; }
+
   clearErr();
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
   if (force) cClear();
 
   try {
-    // Step 1: auth
     status('Checking authentication…', true);
     const auth = await apiFetch('/api/v3/companies/auth-data/', 'auth', force);
     S.company = auth.authCompany;
     renderHeader(S.company, null);
 
-    // Step 2: parallel data fetch
     status('Fetching game data…', true);
     const [
       buildings, encB, encR, ticker,
@@ -122,11 +174,9 @@ async function loadAll(force = false) {
     S.cashflow     = cashflow;
     S.aoPreview    = aoPreview;
 
-    // Step 3: calculate
     status('Calculating…', true);
     calculate();
 
-    // Step 4: render
     renderHeader(S.company, S.balance);
     renderFinancials();
     renderSurplus();
@@ -139,15 +189,13 @@ async function loadAll(force = false) {
   } catch (err) {
     console.error(err);
     if (err && err.type === 'auth') {
-      showErr(
-        'Not logged in to SimCompanies.',
-        'Please <a href="https://www.simcompanies.com" target="_blank">log in at simcompanies.com</a> then click Refresh.'
-      );
+      clearStoredCookie();
+      showSetup({ error: 'Session expired or invalid — please paste a fresh cookie.' });
       status('Authentication required', false);
     } else {
       showErr(
         'Failed to load data.',
-        `${err?.path || ''} — status ${err?.status || 'network error'}. Check the browser console for details.`
+        `${err?.path || ''} — status ${err?.status || 'network error'}. Check the browser console.`
       );
       status('Load failed', false);
     }
@@ -239,7 +287,6 @@ function calculate() {
   for (const bld of S.buildings) {
     const enc = matchEncBuilding(bld, encBldMap);
     if (!enc) continue;
-
     const prod = enc.production;
     if (!prod) continue;
 
@@ -292,12 +339,11 @@ function calculate() {
   doSort('d');
 }
 
-/* Admin Overhead → effective production multiplier */
 function aoMultiplier(raw) {
   if (raw == null || raw === 0) return 1;
-  if (raw > 1 && raw < 4)   return Math.max(0, 2 - raw);      // multiplier: 1.0588 → 0.9412
-  if (raw > 0 && raw < 1)   return Math.max(0, 1 - raw);      // fraction:   0.0588 → 0.9412
-  if (raw >= 1 && raw <= 100) return Math.max(0, 1 - raw / 100); // percent:  5.88   → 0.9412
+  if (raw > 1 && raw < 4)    return Math.max(0, 2 - raw);
+  if (raw > 0 && raw < 1)    return Math.max(0, 1 - raw);
+  if (raw >= 1 && raw <= 100) return Math.max(0, 1 - raw / 100);
   return 1;
 }
 
@@ -328,7 +374,6 @@ function matchEncBuilding(bld, map) {
       || null;
 }
 
-/* Make-vs-Buy */
 function calcMVB(kindId, deficitPerDay, marketMap) {
   const enc = S.encBuildings.find(e => {
     const p = e.production;
@@ -352,12 +397,11 @@ function calcMVB(kindId, deficitPerDay, marketMap) {
 
   const makeCPU   = wageCPU + matCPU;
   const buyCPU    = marketMap[+kindId] || 0;
-  const makeTotal = makeCPU   * deficitPerDay;
-  const buyTotal  = buyCPU    * deficitPerDay;
+  const makeTotal = makeCPU * deficitPerDay;
+  const buyTotal  = buyCPU  * deficitPerDay;
 
   return {
-    makeCPU, buyCPU, makeTotal, buyTotal,
-    wageCPU, matCPU,
+    makeCPU, buyCPU, makeTotal, buyTotal, wageCPU, matCPU,
     saving: Math.abs(makeTotal - buyTotal),
     deficitPerDay,
     bldName: enc.name || 'Building',
@@ -372,16 +416,13 @@ function applySort(tbl, col, dir) {
   doSort(tbl);
   if (tbl === 's') renderSurplus(); else renderDeficit();
 
-  // Highlight active sort button
   const prefix = tbl === 's' ? 'ss' : 'ds';
   document.querySelectorAll(`[id^="${prefix}-"]`).forEach(b => b.classList.remove('active'));
   const colMap = tbl === 's'
-    ? { net:'net', name:'name', produced:'produced', mv:'val' }
-    : { net:'net', name:'name', buyCost:'buy' };
-  const bid = `${prefix}-${colMap[col] || col}`;
-  document.getElementById(bid)?.classList.add('active');
+    ? { net: 'net', name: 'name', produced: 'produced', mv: 'val' }
+    : { net: 'net', name: 'name', buyCost: 'buy' };
+  document.getElementById(`${prefix}-${colMap[col] || col}`)?.classList.add('active');
 }
-
 function doSort(tbl) {
   const { col, dir } = sortSt[tbl];
   const rows = tbl === 's' ? surRows : defRows;
@@ -443,10 +484,9 @@ function renderDeficit() {
 
 function mvbDetail(r) {
   const m = r.mvb;
-  if (!m) return `<div class="detail-inner"><p style="color:var(--muted);font-size:13px">No producer building found in the encyclopedia for this resource. It may only be purchasable from the market.</p></div>`;
+  if (!m) return `<div class="detail-inner"><p style="color:var(--muted);font-size:13px">No producer building found in the encyclopedia for this resource.</p></div>`;
 
-  const buyWins  = m.buyTotal <= m.makeTotal;
-  const makeWins = !buyWins;
+  const buyWins = m.buyTotal <= m.makeTotal;
 
   return `<div class="detail-inner">
     <div class="mvb-grid">
@@ -457,15 +497,15 @@ function mvbDetail(r) {
           ${fmtSC(m.buyCPU)} SC/unit &times; ${fmtN(m.deficitPerDay)} units/day
         </div>
       </div>
-      <div class="mvb-box ${makeWins ? 'win2' : ''}">
-        <div class="mvb-lbl">${makeWins ? '&#10003; ' : ''}Produce in ${esc(m.bldName)}</div>
+      <div class="mvb-box ${!buyWins ? 'win2' : ''}">
+        <div class="mvb-lbl">${!buyWins ? '&#10003; ' : ''}Produce in ${esc(m.bldName)}</div>
         <div class="mvb-cost">${fmtSC(m.makeTotal)} SC/day</div>
         <div class="mvb-break">
           ${fmtSC(m.makeCPU)} SC/unit total<br>
           Wages: ${fmtSC(m.wageCPU)} SC/unit<br>
           Materials: ${fmtSC(m.matCPU)} SC/unit
         </div>
-        ${makeWins ? `<div class="ao-warn">&#9888; Adding a ${esc(m.bldName)} will increase admin overhead</div>` : ''}
+        ${!buyWins ? `<div class="ao-warn">&#9888; Adding a ${esc(m.bldName)} increases admin overhead</div>` : ''}
       </div>
       <div class="mvb-box">
         <div class="mvb-lbl">Daily Saving</div>
@@ -473,9 +513,7 @@ function mvbDetail(r) {
           ${fmtSC(m.saving)} SC/day
         </div>
         <div class="mvb-break">
-          ${buyWins
-            ? 'Buying is cheaper per unit at any volume'
-            : 'Producing is cheaper per unit at any volume'}
+          ${buyWins ? 'Buying is cheaper at any volume' : 'Producing is cheaper at any volume'}
         </div>
       </div>
     </div>
@@ -488,7 +526,7 @@ function mvbDetail(r) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   EVENT DELEGATION — deficit row expand/collapse
+   EVENT DELEGATION — deficit rows
 ───────────────────────────────────────────────────────────────────────────── */
 document.getElementById('defTbody').addEventListener('click', e => {
   const row = e.target.closest('.def-row');
@@ -501,24 +539,25 @@ document.getElementById('defTbody').addEventListener('click', e => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   SORT BUTTON WIRING  (data-tbl / data-col / data-dir on each button)
+   SORT BUTTONS  (data-sort / data-tbl / data-col / data-dir)
 ───────────────────────────────────────────────────────────────────────────── */
 document.querySelectorAll('[data-sort]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    applySort(btn.dataset.tbl, btn.dataset.col, btn.dataset.dir);
-  });
+  btn.addEventListener('click', () => applySort(btn.dataset.tbl, btn.dataset.col, btn.dataset.dir));
 });
 
-/* Column header sort (th elements carry data-sort-tbl / data-sort-col) */
 document.querySelectorAll('th[data-sort-tbl]').forEach(th => {
   th.addEventListener('click', () => {
     const tbl = th.dataset.sortTbl;
     const col = th.dataset.sortCol;
-    const cur = sortSt[tbl];
-    const dir = (cur.col === col && cur.dir === 'asc') ? 'desc' : 'asc';
+    const dir = (sortSt[tbl].col === col && sortSt[tbl].dir === 'asc') ? 'desc' : 'asc';
     applySort(tbl, col, dir);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   REFRESH BUTTON
+───────────────────────────────────────────────────────────────────────────── */
+document.getElementById('refreshBtn').addEventListener('click', () => loadAll(true));
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FORMAT HELPERS
@@ -559,11 +598,6 @@ function iconHtml(r) {
     ? `<div class="ricon"><img src="${BASE}${r.image}" loading="lazy" alt="" onerror="this.parentNode.style.display='none'"></div>`
     : `<div class="ricon"></div>`;
 }
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   REFRESH BUTTON
-───────────────────────────────────────────────────────────────────────────── */
-document.getElementById('refreshBtn').addEventListener('click', () => loadAll(true));
 
 /* ─────────────────────────────────────────────────────────────────────────────
    BOOT

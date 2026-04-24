@@ -8,6 +8,30 @@
 </head>
 <body>
 
+<!-- ── Setup Modal ──────────────────────────────────────────────────────── -->
+<div id="setupModal" class="modal-backdrop" style="display:none">
+  <div class="modal">
+    <div class="modal-title">Session Setup</div>
+    <p class="modal-desc">
+      This app needs your SimCompanies session cookie to fetch your data via the proxy.<br>
+      This is a one-time step — it stays saved until your session expires.
+    </p>
+
+    <div class="steps">
+      <div class="step"><span class="step-n">1</span>Open <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a> in this browser and make sure you're logged in.</div>
+      <div class="step"><span class="step-n">2</span>Press <kbd>F12</kbd> to open DevTools, then click the <strong>Network</strong> tab.</div>
+      <div class="step"><span class="step-n">3</span>Reload the SimCompanies page (<kbd>Ctrl+R</kbd>).</div>
+      <div class="step"><span class="step-n">4</span>Click any request to <code>www.simcompanies.com</code> in the list.</div>
+      <div class="step"><span class="step-n">5</span>Scroll down in the right panel to <strong>Request Headers</strong> and find the <code>cookie:</code> line. Click it and copy the <em>entire value</em>.</div>
+    </div>
+
+    <textarea id="cookieInput" class="cookie-input" placeholder="Paste the full cookie string here…" rows="4"></textarea>
+    <div id="setupError" class="setup-error" style="display:none"></div>
+    <button id="saveSessionBtn" class="btn btn-primary">Save &amp; Load Data</button>
+  </div>
+</div>
+
+<!-- ── Header ───────────────────────────────────────────────────────────── -->
 <div class="header">
   <div class="hlogo" id="hLogo">&#127981;</div>
   <div>
@@ -15,9 +39,11 @@
     <div class="hmeta" id="hMeta">Loading…</div>
   </div>
   <div class="hcash" id="hCash"></div>
+  <button class="btn" id="updateSessionBtn" title="Update session cookie">&#9881; Session</button>
   <button class="btn" id="refreshBtn">&#8635; Refresh</button>
 </div>
 
+<!-- ── Status bar ───────────────────────────────────────────────────────── -->
 <div class="sbar">
   <div class="spin" id="spin"></div>
   <span id="stext">Initializing…</span>
@@ -45,9 +71,9 @@
       <span class="badge" id="surCount">0</span>
       <div class="sort-wrap">
         <span>Sort:</span>
-        <button class="sbtn" id="ss-net"      data-sort data-tbl="s" data-col="net"      data-dir="desc">Net Balance</button>
-        <button class="sbtn" id="ss-name"     data-sort data-tbl="s" data-col="name"     data-dir="asc">Name</button>
-        <button class="sbtn active" id="ss-val" data-sort data-tbl="s" data-col="mv"     data-dir="desc">Market Value</button>
+        <button class="sbtn" id="ss-net"  data-sort data-tbl="s" data-col="net"  data-dir="desc">Net Balance</button>
+        <button class="sbtn" id="ss-name" data-sort data-tbl="s" data-col="name" data-dir="asc">Name</button>
+        <button class="sbtn active" id="ss-val" data-sort data-tbl="s" data-col="mv" data-dir="desc">Market Value</button>
       </div>
     </div>
     <div class="tbl-wrap">
