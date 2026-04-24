@@ -133,6 +133,30 @@ function showErr(msg, detail) {
 function clearErr() { document.getElementById('errBox').innerHTML = ''; }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   ENCYCLOPEDIA BUILDINGS — try several URL patterns until one works
+───────────────────────────────────────────────────────────────────────────── */
+const ENC_BLD_URLS = [
+  '/api/v3/en/encyclopedia/buildings/',
+  '/api/v4/en/0/encyclopedia/buildings/',
+  '/api/v3/0/encyclopedia/buildings/',
+  '/api/v3/0/encyclopedia/buildings/k/',
+];
+
+async function fetchEncBuildings(force) {
+  for (const url of ENC_BLD_URLS) {
+    try {
+      const data = await apiFetch(url, 'enc_bld', force);
+      console.log('Buildings encyclopedia loaded from:', url);
+      return data;
+    } catch (e) {
+      console.warn('Buildings enc failed for', url, e?.status);
+    }
+  }
+  console.error('All buildings encyclopedia URLs failed — production recipes unavailable');
+  return [];
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    MAIN LOAD
 ───────────────────────────────────────────────────────────────────────────── */
 async function loadAll(force = false) {
@@ -155,10 +179,10 @@ async function loadAll(force = false) {
       buildings, encB, encR, ticker,
       balance, income, cashflow, aoPreview,
     ] = await Promise.all([
-      apiFetch('/api/v2/companies/me/buildings/',                        'buildings',  force),
-      apiFetch('/api/v3/0/encyclopedia/buildings/k/',                    'enc_bld',    force),
-      apiFetch('/api/v3/en/encyclopedia/resources/',                     'enc_res',    force),
-      apiFetch('/api/v3/market-ticker/0/',                               'ticker',     force),
+      apiFetch('/api/v2/companies/me/buildings/',                        'buildings',  force).catch(() => []),
+      fetchEncBuildings(force),
+      apiFetch('/api/v3/en/encyclopedia/resources/',                     'enc_res',    force).catch(() => []),
+      apiFetch('/api/v3/market-ticker/0/',                               'ticker',     force).catch(() => []),
       apiFetch('/api/v2/companies/me/balance-sheet/',                    'balance',    force).catch(() => null),
       apiFetch('/api/v2/companies/me/income-statement/',                 'income',     force).catch(() => null),
       apiFetch('/api/v2/companies/me/cashflow/recent/',                  'cashflow',   force).catch(() => null),
