@@ -1,21 +1,202 @@
 'use strict';
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CONFIG  — update PROXY_URL after deploying to Render
+   CONFIG
 ───────────────────────────────────────────────────────────────────────────── */
-const PROXY_URL = 'https://simcompanies-advisor.onrender.com'; // ← your Render URL
-const BASE      = 'https://www.simcompanies.com';              // for image src only
+const PROXY_URL = 'https://simcompanies-advisor.onrender.com';
+const BASE      = 'https://www.simcompanies.com';
 const TTL       = 5 * 60 * 1000;
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   SESSION COOKIE  (stored in localStorage, sent as X-Sim-Cookie header)
+   ENCYCLOPEDIA
+   PROD: kind → { n:name, pph:producedPerHour, i:[{k:inputKind, a:amtPerOutput}] }
+   BLDS: [{k:kind, n:name, w:wages/hr, c:category, o:[outputKinds]}]
+   Recipes for items 55+ are estimates — core chain (1-54) is verified.
 ───────────────────────────────────────────────────────────────────────────── */
-function getStoredCookie() { return localStorage.getItem('sc_cookie') || ''; }
-function saveStoredCookie(v) { localStorage.setItem('sc_cookie', v.trim()); }
-function clearStoredCookie() { localStorage.removeItem('sc_cookie'); }
+const PROD = {
+  1:  {n:'Power',                  pph:2566.94, i:[]},
+  2:  {n:'Water',                  pph:1626.43, i:[{k:1,a:0.2}]},
+  3:  {n:'Apples',                 pph:202.19,  i:[{k:2,a:3},{k:66,a:1}]},
+  4:  {n:'Oranges',                pph:186.01,  i:[{k:2,a:3},{k:66,a:1}]},
+  5:  {n:'Grapes',                 pph:161.75,  i:[{k:2,a:4},{k:66,a:1}]},
+  6:  {n:'Grain',                  pph:808.75,  i:[{k:2,a:0.5},{k:66,a:1}]},
+  7:  {n:'Steak',                  pph:25.67,   i:[{k:115,a:0.125}]},
+  8:  {n:'Sausages',               pph:77.01,   i:[{k:116,a:0.0625}]},
+  9:  {n:'Eggs',                   pph:316.47,  i:[{k:2,a:0.4},{k:6,a:0.5}]},
+  10: {n:'Crude Oil',              pph:41.52,   i:[{k:1,a:25}]},
+  11: {n:'Petrol',                 pph:111.41,  i:[{k:1,a:15},{k:10,a:0.75},{k:73,a:0.25}]},
+  12: {n:'Diesel',                 pph:115.13,  i:[{k:1,a:15},{k:10,a:0.75},{k:73,a:0.25}]},
+  13: {n:'Transport',              pph:3173.95, i:[{k:12,a:0.005},{k:1,a:0.01}]},
+  14: {n:'Minerals',               pph:119.23,  i:[{k:1,a:20},{k:2,a:1}]},
+  15: {n:'Bauxite',                pph:96.52,   i:[{k:1,a:14},{k:2,a:0.5}]},
+  16: {n:'Silicon',                pph:154.02,  i:[{k:1,a:3},{k:44,a:2}]},
+  17: {n:'Chemicals',              pph:213.91,  i:[{k:1,a:0.2},{k:14,a:1}]},
+  18: {n:'Aluminium',              pph:119.79,  i:[{k:1,a:15},{k:15,a:1}]},
+  19: {n:'Plastic',                pph:204.25,  i:[{k:1,a:5},{k:10,a:0.2}]},
+  20: {n:'Processors',             pph:9.18,    i:[{k:16,a:4},{k:17,a:1}]},
+  21: {n:'Electronic Components',  pph:41.33,   i:[{k:16,a:3},{k:17,a:1}]},
+  22: {n:'Batteries',              pph:25.26,   i:[{k:17,a:4}]},
+  23: {n:'Displays',               pph:32.14,   i:[{k:16,a:5},{k:17,a:4}]},
+  24: {n:'Smart Phones',           pph:11.48,   i:[{k:20,a:2},{k:21,a:1},{k:22,a:1},{k:23,a:1},{k:18,a:2}]},
+  25: {n:'Tablets',                pph:11.48,   i:[{k:20,a:2},{k:21,a:1},{k:22,a:1},{k:23,a:2},{k:18,a:3}]},
+  26: {n:'Laptops',                pph:9.18,    i:[{k:20,a:4},{k:21,a:3},{k:22,a:2},{k:23,a:2},{k:19,a:3}]},
+  27: {n:'Monitors',               pph:18.37,   i:[{k:21,a:2},{k:23,a:3},{k:19,a:3}]},
+  28: {n:'Televisions',            pph:16.07,   i:[{k:20,a:1},{k:21,a:4},{k:23,a:4},{k:19,a:5}]},
+  29: {n:'Plant Research',         pph:4.78,    i:[]},
+  30: {n:'Energy Research',        pph:3.30,    i:[]},
+  31: {n:'Mining Research',        pph:3.00,    i:[]},
+  32: {n:'Electronics Research',   pph:2.40,    i:[]},
+  33: {n:'Breeding Research',      pph:3.85,    i:[]},
+  34: {n:'Chemistry Research',     pph:4.71,    i:[]},
+  35: {n:'Software',               pph:5.71,    i:[]},
+  40: {n:'Cotton',                 pph:258.80,  i:[{k:2,a:4},{k:66,a:1}]},
+  41: {n:'Fabric',                 pph:241.12,  i:[{k:1,a:15},{k:40,a:1}]},
+  42: {n:'Iron Ore',               pph:181.69,  i:[{k:1,a:20},{k:2,a:1}]},
+  43: {n:'Steel',                  pph:192.52,  i:[{k:1,a:10},{k:42,a:1}]},
+  44: {n:'Sand',                   pph:1419.44, i:[{k:1,a:5}]},
+  45: {n:'Glass',                  pph:128.35,  i:[{k:1,a:8},{k:44,a:1}]},
+  46: {n:'Leather',                pph:30.14,   i:[{k:1,a:5},{k:115,a:0.25}]},
+  47: {n:'On-board Computer',      pph:13.78,   i:[{k:20,a:2},{k:21,a:1}]},
+  48: {n:'Electric Motor',         pph:30.78,   i:[{k:1,a:5},{k:21,a:2}]},
+  49: {n:'Luxury Car Interior',    pph:19.93,   i:[{k:18,a:3},{k:23,a:2}]},
+  50: {n:'Basic Interior',         pph:31.89,   i:[{k:19,a:2},{k:21,a:1}]},
+  51: {n:'Car Body',               pph:23.92,   i:[{k:43,a:5},{k:18,a:2}]},
+  52: {n:'Combustion Engine',      pph:5.60,    i:[{k:17,a:3},{k:43,a:2}]},
+  53: {n:'Economy E-Car',          pph:19.93,   i:[{k:51,a:1},{k:50,a:1},{k:22,a:2}]},
+  54: {n:'Luxury E-Car',           pph:3.99,    i:[{k:51,a:1},{k:49,a:1},{k:22,a:2}]},
+  55: {n:'Economy Car',            pph:13.95,   i:[{k:51,a:1},{k:50,a:1},{k:52,a:1}]},
+  56: {n:'Luxury Car',             pph:1.99,    i:[{k:51,a:1},{k:49,a:1},{k:52,a:1}]},
+  57: {n:'Truck',                  pph:4.78,    i:[{k:51,a:2},{k:50,a:1},{k:52,a:1}]},
+  58: {n:'Automotive Research',    pph:4.19,    i:[]},
+  59: {n:'Fashion Research',       pph:6.78,    i:[]},
+  60: {n:'Underwear',              pph:165.77,  i:[{k:41,a:1}]},
+  61: {n:'Gloves',                 pph:143.17,  i:[{k:41,a:1}]},
+  62: {n:'Dress',                  pph:150.70,  i:[{k:41,a:2}]},
+  63: {n:'Stiletto Heel',          pph:97.96,   i:[{k:41,a:1},{k:46,a:1}]},
+  64: {n:'Handbags',               pph:67.82,   i:[{k:46,a:2}]},
+  65: {n:'Sneakers',               pph:173.31,  i:[{k:41,a:2}]},
+  66: {n:'Seeds',                  pph:889.63,  i:[]},
+  67: {n:'Xmas Crackers',          pph:222.47,  i:[]},
+  68: {n:'Gold Ore',               pph:56.78,   i:[{k:1,a:20}]},
+  69: {n:'Golden Bars',            pph:29.95,   i:[{k:1,a:20},{k:68,a:1}]},
+  70: {n:'Luxury Watch',           pph:18.84,   i:[{k:69,a:0.1},{k:21,a:5}]},
+  71: {n:'Necklace',               pph:41.44,   i:[{k:69,a:0.1},{k:21,a:3}]},
+  72: {n:'Sugarcane',              pph:647.00,  i:[{k:2,a:3},{k:66,a:1}]},
+  73: {n:'Ethanol',                pph:60.94,   i:[{k:72,a:4},{k:1,a:5}]},
+  74: {n:'Methane',                pph:55.36,   i:[]},
+  75: {n:'Carbon Fibers',          pph:245.11,  i:[{k:10,a:2},{k:1,a:3}]},
+  76: {n:'Carbon Composite',       pph:68.45,   i:[{k:75,a:5},{k:17,a:3}]},
+  77: {n:'Fuselage',               pph:3.30,    i:[{k:76,a:5},{k:18,a:3}]},
+  78: {n:'Wing',                   pph:8.11,    i:[{k:76,a:4},{k:18,a:2}]},
+  79: {n:'High-grade E-comps',     pph:1.84,    i:[{k:20,a:2},{k:21,a:2},{k:16,a:5}]},
+  80: {n:'Flight Computer',        pph:2.26,    i:[{k:79,a:2},{k:21,a:3}]},
+  81: {n:'Cockpit',                pph:2.26,    i:[{k:79,a:2},{k:80,a:1}]},
+  82: {n:'Attitude Control',       pph:2.72,    i:[{k:79,a:2},{k:21,a:2}]},
+  83: {n:'Rocket Fuel',            pph:77.99,   i:[{k:74,a:4},{k:17,a:2}]},
+  84: {n:'Propellant Tank',        pph:4.51,    i:[{k:76,a:3},{k:43,a:2}]},
+  85: {n:'Solid Fuel Booster',     pph:0.28,    i:[{k:83,a:10},{k:84,a:1}]},
+  86: {n:'Rocket Engine',          pph:0.28,    i:[{k:79,a:3},{k:43,a:5}]},
+  87: {n:'Heat Shield',            pph:12.01,   i:[{k:76,a:4},{k:17,a:2}]},
+  88: {n:'Ion Drive',              pph:0.56,    i:[{k:79,a:5},{k:17,a:5}]},
+  89: {n:'Jet Engine',             pph:0.84,    i:[{k:18,a:3},{k:43,a:3},{k:21,a:2}]},
+  90: {n:'Sub-orbital 2nd Stage',  pph:3.00,    i:[{k:84,a:1},{k:82,a:1},{k:86,a:1}]},
+  91: {n:'Sub-orbital Rocket',     pph:0.63,    i:[{k:85,a:2},{k:90,a:1}]},
+  92: {n:'Orbital Booster',        pph:1.50,    i:[{k:84,a:2},{k:86,a:2},{k:87,a:1}]},
+  93: {n:'Starship',               pph:0.30,    i:[{k:85,a:3},{k:92,a:1},{k:88,a:1}]},
+  94: {n:'BFR',                    pph:0.21,    i:[{k:93,a:1},{k:88,a:2}]},
+  95: {n:'Jumbo Jet',              pph:0.06,    i:[{k:77,a:1},{k:78,a:2},{k:89,a:2},{k:81,a:1}]},
+  96: {n:'Luxury Jet',             pph:0.17,    i:[{k:77,a:1},{k:78,a:1},{k:89,a:1},{k:81,a:1}]},
+  97: {n:'Single Engine Plane',    pph:1.48,    i:[{k:77,a:1},{k:89,a:1},{k:80,a:1}]},
+  98: {n:'Quadcopter',             pph:12.45,   i:[{k:21,a:3},{k:19,a:2},{k:48,a:1}]},
+  99: {n:'Satellite',              pph:0.40,    i:[{k:79,a:3},{k:82,a:1}]},
+ 100: {n:'Aerospace Research',     pph:0.35,    i:[]},
+ 101: {n:'Reinforced Concrete',    pph:188.27,  i:[{k:103,a:2},{k:43,a:1},{k:44,a:2}]},
+ 102: {n:'Bricks',                 pph:367.35,  i:[{k:104,a:3},{k:1,a:5}]},
+ 103: {n:'Cement',                 pph:298.47,  i:[{k:105,a:3},{k:1,a:5}]},
+ 104: {n:'Clay',                   pph:1078.77, i:[{k:1,a:5}]},
+ 105: {n:'Limestone',              pph:794.89,  i:[{k:1,a:3}]},
+ 106: {n:'Wood',                   pph:76.83,   i:[]},
+ 107: {n:'Steel Beams',            pph:129.98,  i:[{k:43,a:5},{k:1,a:10}]},
+ 108: {n:'Planks',                 pph:115.13,  i:[{k:106,a:5},{k:1,a:5}]},
+ 109: {n:'Windows',                pph:16.71,   i:[{k:45,a:4},{k:18,a:1}]},
+ 110: {n:'Tools',                  pph:26.00,   i:[{k:43,a:2},{k:1,a:5}]},
+ 111: {n:'Construction Units',     pph:0.99,    i:[{k:101,a:5},{k:110,a:2},{k:108,a:3},{k:109,a:2}]},
+ 112: {n:'Bulldozer',              pph:5.58,    i:[{k:43,a:10},{k:52,a:1},{k:48,a:1}]},
+ 113: {n:'Materials Research',     pph:3.42,    i:[]},
+ 114: {n:'Robots',                 pph:6.00,    i:[{k:20,a:4},{k:21,a:3},{k:48,a:2}]},
+ 115: {n:'Cows',                   pph:37.68,   i:[{k:139,a:2},{k:2,a:1}]},
+ 116: {n:'Pigs',                   pph:82.89,   i:[{k:139,a:2},{k:6,a:1}]},
+ 117: {n:'Milk',                   pph:120.56,  i:[{k:115,a:0.125},{k:2,a:2}]},
+ 118: {n:'Coffee Beans',           pph:412.46,  i:[{k:2,a:3},{k:66,a:1}]},
+ 119: {n:'Coffee Powder',          pph:22.96,   i:[{k:118,a:5},{k:1,a:3}]},
+ 120: {n:'Vegetables',             pph:283.06,  i:[{k:2,a:3},{k:66,a:1}]},
+ 121: {n:'Bread',                  pph:11.96,   i:[{k:137,a:2}]},
+ 122: {n:'Cheese',                 pph:5.51,    i:[{k:117,a:4}]},
+ 123: {n:'Apple Pie',              pph:5.98,    i:[{k:137,a:2},{k:3,a:4},{k:135,a:1}]},
+ 124: {n:'Orange Juice',           pph:91.41,   i:[{k:4,a:4},{k:1,a:2}]},
+ 125: {n:'Apple Cider',            pph:36.56,   i:[{k:3,a:4},{k:1,a:2}]},
+ 126: {n:'Ginger Beer',            pph:73.13,   i:[{k:135,a:2},{k:1,a:2}]},
+ 127: {n:'Frozen Pizza',           pph:9.18,    i:[{k:137,a:1},{k:138,a:1},{k:122,a:1}]},
+ 128: {n:'Pasta',                  pph:18.37,   i:[{k:133,a:2},{k:9,a:1}]},
+ 129: {n:'Hamburger',              pph:0.52,    i:[{k:7,a:2},{k:121,a:1},{k:138,a:1}]},
+ 130: {n:'Lasagna',                pph:1.56,    i:[{k:128,a:2},{k:138,a:1},{k:122,a:1}]},
+ 131: {n:'Meat Balls',             pph:1.04,    i:[{k:8,a:2},{k:138,a:1}]},
+ 132: {n:'Cocktails',              pph:0.52,    i:[{k:73,a:2},{k:124,a:1}]},
+ 133: {n:'Flour',                  pph:87.25,   i:[{k:6,a:5},{k:1,a:3}]},
+ 134: {n:'Butter',                 pph:13.78,   i:[{k:117,a:2},{k:1,a:2}]},
+ 135: {n:'Sugar',                  pph:41.33,   i:[{k:72,a:5},{k:1,a:3}]},
+ 136: {n:'Cocoa',                  pph:169.84,  i:[{k:2,a:3},{k:66,a:1}]},
+ 137: {n:'Dough',                  pph:11.96,   i:[{k:133,a:2},{k:2,a:1}]},
+ 138: {n:'Sauce',                  pph:0.78,    i:[{k:120,a:3},{k:1,a:1}]},
+ 139: {n:'Fodder',                 pph:284.70,  i:[{k:6,a:5},{k:1,a:3}]},
+ 140: {n:'Chocolate',              pph:3.21,    i:[{k:136,a:3},{k:135,a:2}]},
+ 141: {n:'Vegetable Oil',          pph:36.74,   i:[{k:120,a:4},{k:1,a:3}]},
+ 142: {n:'Salad',                  pph:2.09,    i:[{k:120,a:3},{k:141,a:1}]},
+ 143: {n:'Samosa',                 pph:1.83,    i:[{k:133,a:2},{k:120,a:2},{k:138,a:1}]},
+ 145: {n:'Recipes',                pph:3.81,    i:[]},
+};
+
+const BLDS = [
+  {k:'E', n:'Power Plant',                  w:414,   c:'production', o:[1]},
+  {k:'W', n:'Water Reservoir',              w:345,   c:'production', o:[2]},
+  {k:'P', n:'Plantation',                   w:103.5, c:'production', o:[3,4,5,6,40,66,72,106,118,120,136]},
+  {k:'F', n:'Farm',                         w:138,   c:'production', o:[9,46,115,116,117]},
+  {k:'M', n:'Mine',                         w:276,   c:'production', o:[14,15,68,42]},
+  {k:'O', n:'Oil Rig',                      w:517.5, c:'production', o:[10,74]},
+  {k:'Q', n:'Quarry',                       w:276,   c:'production', o:[44,104,105]},
+  {k:'S', n:'Shipping Depot',               w:310.5, c:'production', o:[13]},
+  {k:'Y', n:'Factory',                      w:414,   c:'production', o:[16,17,18,69,43,45,76,67]},
+  {k:'R', n:'Refinery',                     w:483,   c:'production', o:[11,12,19,75,83]},
+  {k:'L', n:'Electronics Factory',          w:379.5, c:'production', o:[20,21,22,23,24,25,26,27,28,114,47,79]},
+  {k:'T', n:'Fashion Factory',              w:138,   c:'production', o:[41,60,61,62,63,64,65,70,71]},
+  {k:'1', n:'Car Factory',                  w:448.5, c:'production', o:[49,50,51,53,54,55,56,57,112]},
+  {k:'D', n:'Propulsion Factory',           w:621,   c:'production', o:[48,52,85,86,88,89]},
+  {k:'7', n:'Aerospace Factory',            w:586.5, c:'production', o:[77,78,84,87,90,92,93]},
+  {k:'8', n:'Aerospace Electronics',        w:724.5, c:'production', o:[80,81,82,98,99]},
+  {k:'9', n:'Vertical Integration Facility',w:759,   c:'production', o:[91,94]},
+  {k:'0', n:'Hangar',                       w:759,   c:'production', o:[95,96,97]},
+  {k:'o', n:'Concrete Plant',               w:379.5, c:'production', o:[101,102,103]},
+  {k:'x', n:'Construction Factory',         w:483,   c:'production', o:[107,108,109,110]},
+  {k:'g', n:'General Contractor',           w:345,   c:'production', o:[111]},
+  {k:'e', n:'Slaughterhouse',               w:414,   c:'production', o:[7,8]},
+  {k:'i', n:'Mill',                         w:379.5, c:'production', o:[119,133,139]},
+  {k:'j', n:'Bakery',                       w:448.5, c:'production', o:[137,121,123]},
+  {k:'m', n:'Catering',                     w:655.5, c:'production', o:[138,129,130,131,142,132,143]},
+  {k:'k', n:'Food Processing Plant',        w:379.5, c:'production', o:[141,128,134,122,135,127,140]},
+  {k:'6', n:'Beverage Factory',             w:241.5, c:'production', o:[73,124,125,126]},
+  {k:'p', n:'Plant Research Center',        w:448.5, c:'research',   o:[29]},
+  {k:'h', n:'Physics Laboratory',           w:586.5, c:'research',   o:[30,31,32]},
+  {k:'b', n:'Breeding Laboratory',          w:414,   c:'research',   o:[33]},
+  {k:'c', n:'Chemistry Laboratory',         w:414,   c:'research',   o:[34,113]},
+  {k:'a', n:'Automotive R&D',               w:552,   c:'research',   o:[58]},
+  {k:'f', n:'Fashion & Design',             w:448.5, c:'research',   o:[59]},
+  {k:'s', n:'Software R&D',                 w:448.5, c:'research',   o:[35]},
+  {k:'l', n:'Launch Pad',                   w:724.5, c:'research',   o:[100]},
+  {k:'q', n:'Kitchen',                      w:517.5, c:'research',   o:[145]},
+];
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   CACHE  (localStorage, per-key TTL)
+   CACHE
 ───────────────────────────────────────────────────────────────────────────── */
 function cGet(k) {
   try {
@@ -35,11 +216,13 @@ function cAge(k) {
     return Math.floor((Date.now() - JSON.parse(raw).t) / 1000);
   } catch { return null; }
 }
-function cClear() {
-  Object.keys(localStorage)
-    .filter(k => k.startsWith('sc_') && k !== 'sc_cookie')
-    .forEach(k => localStorage.removeItem(k));
-}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SESSION COOKIE  (for optional financial snapshot)
+───────────────────────────────────────────────────────────────────────────── */
+function getStoredCookie() { return localStorage.getItem('sc_cookie') || ''; }
+function saveStoredCookie(v) { localStorage.setItem('sc_cookie', v.trim()); }
+function clearStoredCookie() { localStorage.removeItem('sc_cookie'); }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FETCH via proxy
@@ -49,9 +232,10 @@ async function apiFetch(path, cacheKey, force = false) {
     const hit = cGet(cacheKey);
     if (hit !== null) return hit;
   }
-  const res = await fetch(PROXY_URL + path, {
-    headers: { 'X-Sim-Cookie': getStoredCookie() },
-  });
+  const headers = {};
+  const cookie = getStoredCookie();
+  if (cookie) headers['X-Sim-Cookie'] = cookie;
+  const res = await fetch(PROXY_URL + path, { headers });
   if (res.status === 401 || res.status === 403) throw { type: 'auth', status: res.status, path };
   if (!res.ok) throw { type: 'http', status: res.status, path };
   const data = await res.json();
@@ -62,61 +246,35 @@ async function apiFetch(path, cacheKey, force = false) {
 /* ─────────────────────────────────────────────────────────────────────────────
    STATE
 ───────────────────────────────────────────────────────────────────────────── */
-const S = {
-  company:      null,
-  buildings:    [],
-  encBuildings: [],
-  encResources: [],
-  ticker:       [],
-  balance:      null,
-  income:       null,
-  cashflow:     null,
-  aoPreview:    null,
-};
+let ticker    = [];
+let tickerAge = null;
+
+// Player buildings: array of {bk: buildingKind, pk: productKind, qty: number}
+function loadPlayerBuildings() {
+  try {
+    const raw = localStorage.getItem('sc_player_buildings');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function savePlayerBuildings(arr) {
+  try { localStorage.setItem('sc_player_buildings', JSON.stringify(arr)); } catch {}
+}
+
+let playerBuildings = loadPlayerBuildings();
+
+function getAO() {
+  return parseFloat(localStorage.getItem('sc_ao') || '0') || 0;
+}
+function setAO(v) {
+  localStorage.setItem('sc_ao', String(v));
+}
 
 let surRows = [];
 let defRows = [];
-const sortSt = { s: { col: 'net', dir: 'desc' }, d: { col: 'net', dir: 'asc' } };
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   SETUP MODAL
-───────────────────────────────────────────────────────────────────────────── */
-function showSetup(opts = {}) {
-  const modal = document.getElementById('setupModal');
-  if (opts.error) {
-    document.getElementById('setupError').textContent = opts.error;
-    document.getElementById('setupError').style.display = 'block';
-  } else {
-    document.getElementById('setupError').style.display = 'none';
-  }
-  modal.style.display = 'flex';
-  document.getElementById('cookieInput').focus();
-}
-function hideSetup() {
-  document.getElementById('setupModal').style.display = 'none';
-}
-
-document.getElementById('saveSessionBtn').addEventListener('click', () => {
-  const val = document.getElementById('cookieInput').value.trim();
-  if (!val) {
-    document.getElementById('setupError').textContent = 'Paste your cookie string first.';
-    document.getElementById('setupError').style.display = 'block';
-    return;
-  }
-  saveStoredCookie(val);
-  hideSetup();
-  loadAll(true);
-});
-
-document.getElementById('cookieInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('saveSessionBtn').click();
-});
-
-// Header "Update session" link
-document.getElementById('updateSessionBtn').addEventListener('click', () => {
-  document.getElementById('cookieInput').value = getStoredCookie();
-  showSetup();
-});
+const sortSt = {
+  s: { col: 'mv',      dir: 'desc' },
+  d: { col: 'buyCost', dir: 'desc' },
+};
 
 /* ─────────────────────────────────────────────────────────────────────────────
    STATUS / ERROR
@@ -125,217 +283,201 @@ function status(msg, loading) {
   document.getElementById('stext').textContent = msg;
   document.getElementById('spin').style.display = loading ? 'block' : 'none';
 }
+function setRight(msg) {
+  document.getElementById('sright').textContent = msg;
+}
 function showErr(msg, detail) {
   document.getElementById('errBox').innerHTML =
-    `<div class="error-box"><strong>Error:</strong> ${msg}` +
-    (detail ? `<br><small style="color:#fca5a5">${detail}</small>` : '') + `</div>`;
+    `<div class="error-box"><strong>Error:</strong> ${esc(msg)}` +
+    (detail ? `<br><small style="color:#fca5a5">${esc(detail)}</small>` : '') + `</div>`;
 }
 function clearErr() { document.getElementById('errBox').innerHTML = ''; }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   ENCYCLOPEDIA BUILDINGS — try several URL patterns until one works
+   BUILDING ENTRY UI
 ───────────────────────────────────────────────────────────────────────────── */
-const ENC_BLD_URLS = [
-  '/api/v3/en/encyclopedia/buildings/',
-  '/api/v4/en/0/encyclopedia/buildings/',
-  '/api/v3/0/encyclopedia/buildings/',
-  '/api/v3/0/encyclopedia/buildings/k/',
-];
+function populateBldTypeDropdown() {
+  const sel = document.getElementById('bldType');
+  sel.innerHTML = '<option value="">— Select building —</option>';
+  const production = BLDS.filter(b => b.c === 'production');
+  const research   = BLDS.filter(b => b.c === 'research');
 
-async function fetchEncBuildings(force) {
-  for (const url of ENC_BLD_URLS) {
-    try {
-      const data = await apiFetch(url, 'enc_bld', force);
-      console.log('Buildings encyclopedia loaded from:', url);
-      return data;
-    } catch (e) {
-      console.warn('Buildings enc failed for', url, e?.status);
-    }
+  const grp1 = document.createElement('optgroup');
+  grp1.label = 'Production';
+  for (const b of production) {
+    const opt = document.createElement('option');
+    opt.value = b.k;
+    opt.textContent = b.n;
+    grp1.appendChild(opt);
   }
-  console.error('All buildings encyclopedia URLs failed — production recipes unavailable');
-  return [];
+  sel.appendChild(grp1);
+
+  const grp2 = document.createElement('optgroup');
+  grp2.label = 'Research';
+  for (const b of research) {
+    const opt = document.createElement('option');
+    opt.value = b.k;
+    opt.textContent = b.n;
+    grp2.appendChild(opt);
+  }
+  sel.appendChild(grp2);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   MAIN LOAD
-───────────────────────────────────────────────────────────────────────────── */
-async function loadAll(force = false) {
-  // If no cookie stored, show setup first
-  if (!getStoredCookie()) { showSetup(); return; }
-
-  clearErr();
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = true;
-  if (force) cClear();
-
-  try {
-    status('Checking authentication…', true);
-    const auth = await apiFetch('/api/v3/companies/auth-data/', 'auth', force);
-    S.company = auth.authCompany;
-    renderHeader(S.company, null);
-
-    status('Fetching game data…', true);
-    const [
-      buildings, encB, encR, ticker,
-      balance, income, cashflow, aoPreview,
-    ] = await Promise.all([
-      apiFetch('/api/v2/companies/me/buildings/',                        'buildings',  force).catch(() => []),
-      fetchEncBuildings(force),
-      apiFetch('/api/v3/en/encyclopedia/resources/',                     'enc_res',    force).catch(() => []),
-      apiFetch('/api/v3/market-ticker/0/',                               'ticker',     force).catch(() => []),
-      apiFetch('/api/v2/companies/me/balance-sheet/',                    'balance',    force).catch(() => null),
-      apiFetch('/api/v2/companies/me/income-statement/',                 'income',     force).catch(() => null),
-      apiFetch('/api/v2/companies/me/cashflow/recent/',                  'cashflow',   force).catch(() => null),
-      apiFetch('/api/v2/companies/me/administration-overhead/plus-one/', 'ao_preview', force).catch(() => null),
-    ]);
-
-    S.buildings    = arr(buildings);
-    S.encBuildings = arr(encB);
-    S.encResources = arr(encR);
-    S.ticker       = arr(ticker);
-    S.balance      = balance;
-    S.income       = income;
-    S.cashflow     = cashflow;
-    S.aoPreview    = aoPreview;
-
-    status('Calculating…', true);
-    calculate();
-
-    renderHeader(S.company, S.balance);
-    renderFinancials();
-    renderSurplus();
-    renderDeficit();
-
-    const age  = cAge('auth');
-    const mins = Math.max(0, Math.ceil((TTL - age * 1000) / 60000));
-    status(`Updated ${age < 60 ? age + 's' : Math.floor(age / 60) + 'm'} ago — next refresh in ${mins}m`, false);
-
-  } catch (err) {
-    console.error(err);
-    if (err && err.type === 'auth') {
-      clearStoredCookie();
-      showSetup({ error: 'Session expired or invalid — please paste a fresh cookie.' });
-      status('Authentication required', false);
-    } else {
-      showErr(
-        'Failed to load data.',
-        `${err?.path || ''} — status ${err?.status || 'network error'}. Check the browser console.`
-      );
-      status('Load failed', false);
-    }
-  } finally {
-    btn.disabled = false;
+function updateProductDropdown(bldKind) {
+  const sel = document.getElementById('bldProduct');
+  sel.innerHTML = '<option value="">— Select product —</option>';
+  if (!bldKind) return;
+  const bld = BLDS.find(b => b.k === bldKind);
+  if (!bld) return;
+  for (const pk of bld.o) {
+    const prod = PROD[pk];
+    if (!prod) continue;
+    const opt = document.createElement('option');
+    opt.value = pk;
+    opt.textContent = prod.n;
+    sel.appendChild(opt);
   }
+  if (bld.o.length === 1) sel.value = bld.o[0];
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   HEADER
-───────────────────────────────────────────────────────────────────────────── */
-function renderHeader(co, bal) {
-  if (!co) return;
-  document.getElementById('hName').textContent = co.name;
-  document.getElementById('hMeta').textContent =
-    `Level ${co.level}  ·  AO ${fmtAO(co.adminOverhead)}  ·  Realm ${co.realm === 1 ? 'Speed' : 'Standard'}`;
-  if (co.logo) {
-    document.getElementById('hLogo').innerHTML =
-      `<img src="${BASE}${co.logo}" onerror="this.parentNode.textContent='🏭'">`;
-  }
-  if (bal && bal.cash != null) {
-    document.getElementById('hCash').textContent = fmtSC(bal.cash) + ' SC';
-  }
-}
+document.getElementById('bldType').addEventListener('change', e => {
+  updateProductDropdown(e.target.value);
+});
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   FINANCIALS
-───────────────────────────────────────────────────────────────────────────── */
-function renderFinancials() {
-  document.getElementById('finCard').style.display = 'block';
+document.getElementById('addBldBtn').addEventListener('click', () => {
+  const bk  = document.getElementById('bldType').value;
+  const pk  = parseInt(document.getElementById('bldProduct').value);
+  const qty = parseInt(document.getElementById('bldQty').value) || 1;
 
-  const bal = S.balance;
-  const inc = S.income;
-  const cf  = S.cashflow;
-  const ao  = S.aoPreview;
-  const items = [];
+  if (!bk || !pk) {
+    document.getElementById('addBldError').textContent = 'Select a building type and product.';
+    return;
+  }
+  document.getElementById('addBldError').textContent = '';
 
-  if (bal) {
-    items.push({ lbl: 'Cash',               val: fmtSC(bal.cash),                    cls: 'gold' });
-    if (bal.cashReservedForOrders)
-      items.push({ lbl: 'Reserved (Orders)', val: fmtSC(bal.cashReservedForOrders),  cls: '' });
-    if (bal.workInProcess)
-      items.push({ lbl: 'Work in Process',   val: fmtSC(bal.workInProcess),           cls: '' });
-    if (bal.accountsReceivable)
-      items.push({ lbl: 'Accounts Rec.',     val: fmtSC(bal.accountsReceivable),      cls: 'pos' });
+  // Merge with existing same building+product entry
+  const existing = playerBuildings.find(e => e.bk === bk && e.pk === pk);
+  if (existing) {
+    existing.qty += qty;
+  } else {
+    playerBuildings.push({ bk, pk, qty });
   }
-  if (inc) {
-    items.push({ lbl: 'Revenue (Period)', val: fmtSC(inc.sales || 0),                cls: 'pos' });
-    items.push({ lbl: 'COGS (Period)',    val: fmtSC(Math.abs(inc.cogs || 0)),       cls: 'neg' });
-    const gp = (inc.sales || 0) + (inc.cogs || 0) + (inc.freightOut || 0);
-    items.push({ lbl: 'Gross Profit',     val: fmtSC(gp),                            cls: gp >= 0 ? 'pos' : 'neg' });
-  }
-  if (ao != null) {
-    items.push({ lbl: 'AO if +1 Building', val: fmtAO(ao), cls: '' });
+  savePlayerBuildings(playerBuildings);
+  document.getElementById('bldQty').value = 1;
+  renderBuildingList();
+  recalculate();
+});
+
+document.getElementById('bldQty').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('addBldBtn').click();
+});
+
+document.getElementById('clearBldBtn').addEventListener('click', () => {
+  if (playerBuildings.length === 0) return;
+  playerBuildings = [];
+  savePlayerBuildings(playerBuildings);
+  renderBuildingList();
+  recalculate();
+});
+
+document.getElementById('aoInput').addEventListener('input', e => {
+  setAO(parseFloat(e.target.value) || 0);
+  recalculate();
+});
+
+document.getElementById('bldTbody').addEventListener('click', e => {
+  const btn = e.target.closest('[data-remove]');
+  if (!btn) return;
+  const idx = parseInt(btn.dataset.remove);
+  playerBuildings.splice(idx, 1);
+  savePlayerBuildings(playerBuildings);
+  renderBuildingList();
+  recalculate();
+});
+
+document.getElementById('bldTbody').addEventListener('change', e => {
+  const inp = e.target.closest('[data-qty-idx]');
+  if (!inp) return;
+  const idx = parseInt(inp.dataset.qtyIdx);
+  const val = parseInt(inp.value) || 1;
+  if (val < 1) { inp.value = 1; return; }
+  playerBuildings[idx].qty = val;
+  savePlayerBuildings(playerBuildings);
+  recalculate();
+});
+
+function renderBuildingList() {
+  const tbody = document.getElementById('bldTbody');
+  const count = document.getElementById('bldCount');
+  count.textContent = playerBuildings.length;
+
+  if (!playerBuildings.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--muted);padding:14px 12px;font-size:12px">
+      No buildings added yet. Use the form above to add your buildings.
+    </td></tr>`;
+    return;
   }
 
-  document.getElementById('finGrid').innerHTML = items.map(i =>
-    `<div class="fin-item">
-       <div class="fin-lbl">${i.lbl}</div>
-       <div class="fin-val ${i.cls}">${i.val}<span class="unit">SC</span></div>
-     </div>`
-  ).join('');
-
-  const txnEl = document.getElementById('txnWrap');
-  if (cf && cf.data && cf.data.length) {
-    const rows = cf.data.slice(0, 8).map(t => {
-      const amt = t.amount != null ? t.amount : (t.change || 0);
-      return `<div class="txn">
-        <span>${esc(t.description || t.type || 'Transaction')}</span>
-        <span class="txn-amt ${amt >= 0 ? 'pos' : 'neg'}">${amt >= 0 ? '+' : ''}${fmtSC(amt)} SC</span>
-      </div>`;
-    }).join('');
-    txnEl.innerHTML = `<div class="txn-wrap"><div class="txn-label">Recent Transactions</div>${rows}</div>`;
-  }
+  tbody.innerHTML = playerBuildings.map((e, i) => {
+    const bld  = BLDS.find(b => b.k === e.bk);
+    const prod = PROD[e.pk];
+    const ppd  = prod ? fmtN(prod.pph * e.qty * 24 * aoMultiplier(getAO())) : '—';
+    return `<tr>
+      <td><div class="res">${iconHtml(e.pk)}${esc(bld?.n || e.bk)}</div></td>
+      <td style="color:var(--text)">${esc(prod?.n || '?')}</td>
+      <td class="num">
+        <input type="number" class="qty-inp" value="${e.qty}" min="1"
+               data-qty-idx="${i}" style="width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
+      </td>
+      <td class="num" style="color:var(--muted);font-size:11px">${ppd}/day</td>
+      <td style="text-align:right"><button class="sbtn" data-remove="${i}" title="Remove">&#10005;</button></td>
+    </tr>`;
+  }).join('');
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    CALCULATION ENGINE
 ───────────────────────────────────────────────────────────────────────────── */
-function calculate() {
-  const marketMap = buildMarketMap();
-  const encBldMap = buildEncBldMap();
-  const encResMap = buildEncResMap();
-  const ao        = aoMultiplier(S.company?.adminOverhead);
+function aoMultiplier(ao_pct) {
+  return Math.max(0, 1 - (ao_pct || 0) / 100);
+}
 
+function recalculate() {
+  if (!ticker.length) return;
+  calculate();
+  renderSurplus();
+  renderDeficit();
+  updateSummary();
+}
+
+function calculate() {
+  const marketMap = {};
+  for (const t of ticker) marketMap[+t.kind] = +(t.price || 0);
+
+  const ao   = aoMultiplier(getAO());
   const produced = {};
   const consumed = {};
 
-  for (const bld of S.buildings) {
-    const enc = matchEncBuilding(bld, encBldMap);
-    if (!enc) continue;
-    const prod = enc.production;
+  for (const entry of playerBuildings) {
+    const prod = PROD[+entry.pk];
     if (!prod) continue;
 
-    const pph    = +(prod.producedAnHour || enc.producedAnHour || 0);
-    if (!pph) continue;
+    const unitsDay = prod.pph * entry.qty * 24 * ao;
+    produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
 
-    const outKind = prod.output?.kind ?? prod.outputKind ?? null;
-    if (outKind == null) continue;
-
-    const outAmt   = +(prod.output?.amount ?? prod.outputAmount ?? 1) || 1;
-    const unitsDay = pph * ao * 24;
-
-    produced[outKind] = (produced[outKind] || 0) + unitsDay;
-
-    for (const inp of (prod.inputs || [])) {
-      const inpKind = inp.kind ?? inp.resource ?? null;
-      if (inpKind == null) continue;
-      const inpAmt = +(inp.amount ?? inp.quantity ?? 0);
-      consumed[inpKind] = (consumed[inpKind] || 0) + (inpAmt / outAmt) * unitsDay;
+    for (const inp of prod.i) {
+      consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
     }
   }
 
   surRows = [];
   defRows = [];
-  const allKinds = new Set([...Object.keys(produced), ...Object.keys(consumed)].map(Number));
+  const marketMap2 = marketMap;
+
+  const allKinds = new Set([
+    ...Object.keys(produced).map(Number),
+    ...Object.keys(consumed).map(Number),
+  ]);
 
   for (const kind of allKinds) {
     const p   = produced[kind] || 0;
@@ -343,19 +485,17 @@ function calculate() {
     const net = p - c;
     if (Math.abs(net) < 0.001) continue;
 
-    const res   = encResMap[kind];
-    const name  = res?.name  || `Resource #${kind}`;
-    const image = res?.image || null;
-    const price = marketMap[kind] || 0;
+    const name  = PROD[kind]?.n || `Resource #${kind}`;
+    const price = marketMap2[kind] || 0;
 
     if (net > 0) {
-      surRows.push({ kind, name, image, produced: p, consumed: c, net, price, mv: net * price });
+      surRows.push({ kind, name, produced: p, consumed: c, net, price, mv: net * price });
     } else {
-      const deficit = Math.abs(net);
-      const buyCost = deficit * price;
-      const mvb     = calcMVB(kind, deficit, marketMap);
-      const rec     = mvb ? (mvb.buyTotal <= mvb.makeTotal ? 'buy' : 'make') : 'buy';
-      defRows.push({ kind, name, image, produced: p, consumed: c, net, price, buyCost, mvb, rec });
+      const deficit  = Math.abs(net);
+      const buyCost  = deficit * price;
+      const mvb      = calcMVB(kind, deficit, marketMap2);
+      const rec      = mvb ? (mvb.buyTotal <= mvb.makeTotal ? 'buy' : 'make') : 'buy';
+      defRows.push({ kind, name, produced: p, consumed: c, net, price, buyCost, mvb, rec });
     }
   }
 
@@ -363,72 +503,30 @@ function calculate() {
   doSort('d');
 }
 
-function aoMultiplier(raw) {
-  if (raw == null || raw === 0) return 1;
-  if (raw > 1 && raw < 4)    return Math.max(0, 2 - raw);
-  if (raw > 0 && raw < 1)    return Math.max(0, 1 - raw);
-  if (raw >= 1 && raw <= 100) return Math.max(0, 1 - raw / 100);
-  return 1;
-}
-
-function buildMarketMap() {
-  const m = {};
-  for (const t of S.ticker) if (t.kind != null) m[+t.kind] = +(t.price || 0);
-  return m;
-}
-function buildEncBldMap() {
-  const m = {};
-  for (const b of S.encBuildings) {
-    if (b.kind) m[String(b.kind).toLowerCase()] = b;
-    if (b.name) m[b.name.toLowerCase()] = b;
-  }
-  return m;
-}
-function buildEncResMap() {
-  const m = {};
-  for (const r of S.encResources) {
-    if (r.kind != null) m[+r.kind] = r;
-    if (r.db   != null) m[+r.db]   = r;
-  }
-  return m;
-}
-function matchEncBuilding(bld, map) {
-  return (bld.kind && map[String(bld.kind).toLowerCase()])
-      || (bld.name && map[bld.name.toLowerCase()])
-      || null;
-}
-
 function calcMVB(kindId, deficitPerDay, marketMap) {
-  const enc = S.encBuildings.find(e => {
-    const p = e.production;
-    if (!p) return false;
-    return +(p.output?.kind ?? p.outputKind) === +kindId;
-  });
-  if (!enc) return null;
+  const bld  = BLDS.find(b => b.o.includes(+kindId));
+  if (!bld) return null;
+  const prod = PROD[+kindId];
+  if (!prod) return null;
 
-  const prod   = enc.production;
-  const pph    = +(prod.producedAnHour || enc.producedAnHour || 1);
-  const wages  = +(enc.wages || 0);
-  const outAmt = +(prod.output?.amount ?? prod.outputAmount ?? 1) || 1;
-
-  const wageCPU = wages / pph;
-  let matCPU = 0;
-  for (const inp of (prod.inputs || [])) {
-    const ik = inp.kind ?? inp.resource;
-    const ia = +(inp.amount ?? inp.quantity ?? 0);
-    matCPU  += (ia / outAmt) * (marketMap[+ik] || 0);
+  const ao       = aoMultiplier(getAO());
+  const effPph   = prod.pph * ao;
+  const wageCPU  = effPph > 0 ? bld.w / effPph : 0;
+  let   matCPU   = 0;
+  for (const inp of prod.i) {
+    matCPU += inp.a * (marketMap[+inp.k] || 0);
   }
 
   const makeCPU   = wageCPU + matCPU;
   const buyCPU    = marketMap[+kindId] || 0;
   const makeTotal = makeCPU * deficitPerDay;
-  const buyTotal  = buyCPU  * deficitPerDay;
+  const buyTotal  = buyCPU * deficitPerDay;
 
   return {
     makeCPU, buyCPU, makeTotal, buyTotal, wageCPU, matCPU,
     saving: Math.abs(makeTotal - buyTotal),
     deficitPerDay,
-    bldName: enc.name || 'Building',
+    bldName: bld.n,
   };
 }
 
@@ -442,10 +540,7 @@ function applySort(tbl, col, dir) {
 
   const prefix = tbl === 's' ? 'ss' : 'ds';
   document.querySelectorAll(`[id^="${prefix}-"]`).forEach(b => b.classList.remove('active'));
-  const colMap = tbl === 's'
-    ? { net: 'net', name: 'name', produced: 'produced', mv: 'val' }
-    : { net: 'net', name: 'name', buyCost: 'buy' };
-  document.getElementById(`${prefix}-${colMap[col] || col}`)?.classList.add('active');
+  document.getElementById(`${prefix}-${col}`)?.classList.add('active');
 }
 function doSort(tbl) {
   const { col, dir } = sortSt[tbl];
@@ -468,7 +563,7 @@ function renderSurplus() {
 
   document.getElementById('surTbody').innerHTML = surRows.map(r => `
     <tr>
-      <td><div class="res">${iconHtml(r)}${esc(r.name)}</div></td>
+      <td><div class="res">${iconHtml(r.kind)}${esc(r.name)}</div></td>
       <td class="num">${fmtN(r.produced)}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--green)">+${fmtN(r.net)}</td>
@@ -487,13 +582,13 @@ function renderDeficit() {
 
   document.getElementById('defTbody').innerHTML = defRows.map((r, i) => {
     const chipHtml = r.mvb
-      ? `<span class="chip chip-${r.rec}">${r.rec === 'buy' ? '🛒 Buy' : '⚒ Make'} — save ${fmtSC(r.mvb.saving)} SC/day</span>`
+      ? `<span class="chip chip-${r.rec}">${r.rec === 'buy' ? 'Buy' : 'Make'} &mdash; save ${fmtSC(r.mvb.saving)}/day</span>`
       : `<span style="color:var(--muted);font-size:11px">—</span>`;
 
     return `
     <tr class="def-row" data-idx="${i}" style="cursor:pointer">
       <td><span class="tog" id="tog${i}">&#9658;</span></td>
-      <td><div class="res">${iconHtml(r)}${esc(r.name)}</div></td>
+      <td><div class="res">${iconHtml(r.kind)}${esc(r.name)}</div></td>
       <td class="num">${r.produced > 0.001 ? fmtN(r.produced) : '—'}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--amber)">${fmtN(r.net)}</td>
@@ -511,15 +606,12 @@ function mvbDetail(r) {
   if (!m) return `<div class="detail-inner"><p style="color:var(--muted);font-size:13px">No producer building found in the encyclopedia for this resource.</p></div>`;
 
   const buyWins = m.buyTotal <= m.makeTotal;
-
   return `<div class="detail-inner">
     <div class="mvb-grid">
       <div class="mvb-box ${buyWins ? 'win' : ''}">
         <div class="mvb-lbl">${buyWins ? '&#10003; ' : ''}Buy from Market</div>
         <div class="mvb-cost">${fmtSC(m.buyTotal)} SC/day</div>
-        <div class="mvb-break">
-          ${fmtSC(m.buyCPU)} SC/unit &times; ${fmtN(m.deficitPerDay)} units/day
-        </div>
+        <div class="mvb-break">${fmtSC(m.buyCPU)} SC/unit &times; ${fmtN(m.deficitPerDay)} units/day</div>
       </div>
       <div class="mvb-box ${!buyWins ? 'win2' : ''}">
         <div class="mvb-lbl">${!buyWins ? '&#10003; ' : ''}Produce in ${esc(m.bldName)}</div>
@@ -536,9 +628,7 @@ function mvbDetail(r) {
         <div class="mvb-cost" style="color:${buyWins ? 'var(--green)' : 'var(--amber)'}">
           ${fmtSC(m.saving)} SC/day
         </div>
-        <div class="mvb-break">
-          ${buyWins ? 'Buying is cheaper at any volume' : 'Producing is cheaper at any volume'}
-        </div>
+        <div class="mvb-break">${buyWins ? 'Buying is cheaper' : 'Producing is cheaper'}</div>
       </div>
     </div>
     <div class="detail-note">
@@ -563,12 +653,11 @@ document.getElementById('defTbody').addEventListener('click', e => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   SORT BUTTONS  (data-sort / data-tbl / data-col / data-dir)
+   SORT BUTTONS
 ───────────────────────────────────────────────────────────────────────────── */
 document.querySelectorAll('[data-sort]').forEach(btn => {
   btn.addEventListener('click', () => applySort(btn.dataset.tbl, btn.dataset.col, btn.dataset.dir));
 });
-
 document.querySelectorAll('th[data-sort-tbl]').forEach(th => {
   th.addEventListener('click', () => {
     const tbl = th.dataset.sortTbl;
@@ -579,9 +668,175 @@ document.querySelectorAll('th[data-sort-tbl]').forEach(th => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   SUMMARY LINE
+───────────────────────────────────────────────────────────────────────────── */
+function updateSummary() {
+  if (!playerBuildings.length) {
+    status('No buildings configured — add your buildings in the panel above.', false);
+    setRight('');
+    return;
+  }
+  const totalMV   = surRows.reduce((s, r) => s + r.mv, 0);
+  const totalDef  = defRows.reduce((s, r) => s + r.buyCost, 0);
+  const net       = totalMV - totalDef;
+  const netColor  = net >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('stext').innerHTML =
+    `${playerBuildings.length} building${playerBuildings.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; ` +
+    `${surRows.length} surplus &nbsp;&middot;&nbsp; ` +
+    `${defRows.length} deficit &nbsp;&middot;&nbsp; ` +
+    `Net: <span style="color:${netColor};font-weight:600">${net >= 0 ? '+' : ''}${fmtSC(net)} SC/day</span>`;
+  document.getElementById('spin').style.display = 'none';
+  if (tickerAge !== null) {
+    const mins = Math.ceil(tickerAge / 60);
+    setRight(`Prices ${tickerAge < 60 ? tickerAge + 's' : mins + 'm'} old`);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TICKER LOAD
+───────────────────────────────────────────────────────────────────────────── */
+async function loadTicker(force = false) {
+  status('Fetching live prices…', true);
+  try {
+    const data = await apiFetch('/api/v3/market-ticker/0/', 'ticker', force);
+    ticker = Array.isArray(data) ? data : [];
+    const age = cAge('ticker');
+    tickerAge = age;
+    clearErr();
+    recalculate();
+  } catch (err) {
+    console.error('Ticker load error:', err);
+    showErr(
+      'Could not load market prices.',
+      err?.status
+        ? `HTTP ${err.status} — the proxy at ${PROXY_URL} may be waking up. Try refreshing in 30s.`
+        : 'Network error — check your connection.'
+    );
+    status('Price fetch failed', false);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   OPTIONAL FINANCIAL SNAPSHOT
+───────────────────────────────────────────────────────────────────────────── */
+function showSessionModal(opts = {}) {
+  const modal = document.getElementById('setupModal');
+  const err   = document.getElementById('setupError');
+  if (opts.error) {
+    err.textContent = opts.error;
+    err.style.display = 'block';
+  } else {
+    err.style.display = 'none';
+  }
+  modal.style.display = 'flex';
+  document.getElementById('cookieInput').focus();
+}
+function hideSessionModal() {
+  document.getElementById('setupModal').style.display = 'none';
+}
+
+document.getElementById('updateSessionBtn').addEventListener('click', () => {
+  document.getElementById('cookieInput').value = getStoredCookie();
+  showSessionModal();
+});
+document.getElementById('loadFinBtn').addEventListener('click', () => {
+  document.getElementById('cookieInput').value = getStoredCookie();
+  showSessionModal();
+});
+document.getElementById('saveSessionBtn').addEventListener('click', async () => {
+  const val = document.getElementById('cookieInput').value.trim();
+  if (!val) {
+    document.getElementById('setupError').textContent = 'Paste your cookie string first.';
+    document.getElementById('setupError').style.display = 'block';
+    return;
+  }
+  saveStoredCookie(val);
+  hideSessionModal();
+  await loadFinancials(true);
+});
+document.getElementById('cookieInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('saveSessionBtn').click();
+});
+
+async function loadFinancials(force = false) {
+  if (!getStoredCookie()) { showSessionModal(); return; }
+
+  const content = document.getElementById('finContent');
+  content.style.display = 'block';
+  content.innerHTML = '<div style="padding:14px 16px;color:var(--muted);font-size:13px">Loading financial data…</div>';
+
+  try {
+    const [balance, income, cashflow] = await Promise.all([
+      apiFetch('/api/v2/companies/me/balance-sheet/',    'balance',  force).catch(() => null),
+      apiFetch('/api/v2/companies/me/income-statement/', 'income',   force).catch(() => null),
+      apiFetch('/api/v2/companies/me/cashflow/recent/',  'cashflow', force).catch(() => null),
+    ]);
+    renderFinancials(balance, income, cashflow);
+  } catch (err) {
+    if (err?.type === 'auth') {
+      clearStoredCookie();
+      content.style.display = 'none';
+      showSessionModal({ error: 'Session expired — paste a fresh cookie.' });
+    } else {
+      content.innerHTML = `<div class="error-box" style="margin:14px 16px">Could not load financial data. ${err?.status || 'Network error.'}</div>`;
+    }
+  }
+}
+
+function renderFinancials(bal, inc, cf) {
+  const content = document.getElementById('finContent');
+  const items   = [];
+
+  if (bal) {
+    items.push({ lbl: 'Cash',              val: fmtSC(bal.cash),                   cls: 'gold' });
+    if (bal.cashReservedForOrders)
+      items.push({ lbl: 'Reserved (Orders)', val: fmtSC(bal.cashReservedForOrders), cls: '' });
+    if (bal.workInProcess)
+      items.push({ lbl: 'Work in Process',  val: fmtSC(bal.workInProcess),          cls: '' });
+    if (bal.accountsReceivable)
+      items.push({ lbl: 'Accounts Rec.',    val: fmtSC(bal.accountsReceivable),     cls: 'pos' });
+  }
+  if (inc) {
+    items.push({ lbl: 'Revenue (Period)',  val: fmtSC(inc.sales || 0),              cls: 'pos' });
+    items.push({ lbl: 'COGS (Period)',     val: fmtSC(Math.abs(inc.cogs || 0)),     cls: 'neg' });
+    const gp = (inc.sales || 0) + (inc.cogs || 0) + (inc.freightOut || 0);
+    items.push({ lbl: 'Gross Profit',      val: fmtSC(gp),                          cls: gp >= 0 ? 'pos' : 'neg' });
+  }
+
+  let gridHtml = '';
+  if (items.length) {
+    gridHtml = `<div class="fin-grid">${items.map(i =>
+      `<div class="fin-item"><div class="fin-lbl">${i.lbl}</div>
+       <div class="fin-val ${i.cls}">${i.val}<span class="unit">SC</span></div></div>`
+    ).join('')}</div>`;
+  }
+
+  let txnHtml = '';
+  if (cf?.data?.length) {
+    const rows = cf.data.slice(0, 8).map(t => {
+      const amt = t.amount != null ? t.amount : (t.change || 0);
+      return `<div class="txn">
+        <span>${esc(t.description || t.type || 'Transaction')}</span>
+        <span class="txn-amt ${amt >= 0 ? 'pos' : 'neg'}">${amt >= 0 ? '+' : ''}${fmtSC(amt)} SC</span>
+      </div>`;
+    }).join('');
+    txnHtml = `<div class="txn-wrap"><div class="txn-label">Recent Transactions</div>${rows}</div>`;
+  }
+
+  if (!gridHtml && !txnHtml) {
+    content.innerHTML = '<div style="padding:14px 16px;color:var(--muted);font-size:13px">No financial data returned.</div>';
+    return;
+  }
+
+  content.innerHTML = gridHtml + txnHtml;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    REFRESH BUTTON
 ───────────────────────────────────────────────────────────────────────────── */
-document.getElementById('refreshBtn').addEventListener('click', () => loadAll(true));
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  loadTicker(true);
+});
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FORMAT HELPERS
@@ -601,29 +856,34 @@ function fmtSC(n) {
   if (a >= 1e3) return (n / 1e3).toFixed(1) + 'k';
   return n.toFixed(2);
 }
-function fmtAO(raw) {
-  if (raw == null || raw === 0) return '0%';
-  if (raw > 1 && raw < 4) return ((raw - 1) * 100).toFixed(1) + '%';
-  if (raw > 0 && raw < 1)  return (raw * 100).toFixed(1) + '%';
-  return raw.toFixed(1) + '%';
-}
 function esc(s) {
   return String(s || '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-function arr(x) {
-  if (Array.isArray(x)) return x;
-  if (x && typeof x === 'object') return Object.values(x);
-  return [];
+function resImgPath(kind) {
+  const name = PROD[kind]?.n || '';
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `${BASE}/images/resources/${slug}.png`;
 }
-function iconHtml(r) {
-  return r.image
-    ? `<div class="ricon"><img src="${BASE}${r.image}" loading="lazy" alt="" onerror="this.parentNode.style.display='none'"></div>`
-    : `<div class="ricon"></div>`;
+function iconHtml(kind) {
+  const src = resImgPath(kind);
+  return `<div class="ricon"><img src="${src}" loading="lazy" alt="" onerror="this.parentNode.style.display='none'"></div>`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    BOOT
 ───────────────────────────────────────────────────────────────────────────── */
-loadAll();
+populateBldTypeDropdown();
+
+document.getElementById('aoInput').value = getAO();
+
+renderBuildingList();
+
+if (!playerBuildings.length) {
+  status('No buildings configured — add your buildings in the panel above.', false);
+} else {
+  status('Loading live prices…', true);
+}
+
+loadTicker();

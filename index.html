@@ -8,42 +8,37 @@
 </head>
 <body>
 
-<!-- ── Setup Modal ──────────────────────────────────────────────────────── -->
+<!-- ── Session Modal (for optional financial data) ──────────────────────────── -->
 <div id="setupModal" class="modal-backdrop" style="display:none">
   <div class="modal">
-    <div class="modal-title">Session Setup</div>
+    <div class="modal-title">Load Financial Data</div>
     <p class="modal-desc">
-      This app needs your SimCompanies session cookie to fetch your data via the proxy.<br>
-      This is a one-time step — it stays saved until your session expires.
+      Paste your SimCompanies session cookie to load your balance sheet and transaction history.
+      This is optional — the production calculator works without it.
     </p>
-
     <div class="steps">
-      <div class="step"><span class="step-n">1</span>Open <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a> in this browser and make sure you're logged in.</div>
-      <div class="step"><span class="step-n">2</span>Press <kbd>F12</kbd> to open DevTools, then click the <strong>Network</strong> tab.</div>
-      <div class="step"><span class="step-n">3</span>Reload the SimCompanies page (<kbd>Ctrl+R</kbd>).</div>
-      <div class="step"><span class="step-n">4</span>Click any request to <code>www.simcompanies.com</code> in the list.</div>
-      <div class="step"><span class="step-n">5</span>Scroll down in the right panel to <strong>Request Headers</strong> and find the <code>cookie:</code> line. Click it and copy the <em>entire value</em>.</div>
+      <div class="step"><span class="step-n">1</span>Open <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a> and make sure you're logged in.</div>
+      <div class="step"><span class="step-n">2</span>Press <kbd>F12</kbd> → <strong>Network</strong> tab → reload the page.</div>
+      <div class="step"><span class="step-n">3</span>Click any request to <code>www.simcompanies.com</code>, scroll to <strong>Request Headers</strong>, copy the full <code>cookie:</code> value.</div>
     </div>
-
-    <textarea id="cookieInput" class="cookie-input" placeholder="Paste the full cookie string here…" rows="4"></textarea>
+    <textarea id="cookieInput" class="cookie-input" placeholder="Paste the full cookie string here…" rows="3"></textarea>
     <div id="setupError" class="setup-error" style="display:none"></div>
-    <button id="saveSessionBtn" class="btn btn-primary">Save &amp; Load Data</button>
+    <button id="saveSessionBtn" class="btn btn-primary">Load Financial Data</button>
   </div>
 </div>
 
-<!-- ── Header ───────────────────────────────────────────────────────────── -->
+<!-- ── Header ───────────────────────────────────────────────────────────────── -->
 <div class="header">
-  <div class="hlogo" id="hLogo">&#127981;</div>
+  <div class="hlogo">&#127981;</div>
   <div>
-    <div class="hname" id="hName">SimCompanies Advisor</div>
-    <div class="hmeta" id="hMeta">Loading…</div>
+    <div class="hname">SimCompanies Advisor</div>
+    <div class="hmeta">Production surplus &amp; deficit calculator</div>
   </div>
-  <div class="hcash" id="hCash"></div>
-  <button class="btn" id="updateSessionBtn" title="Update session cookie">&#9881; Session</button>
-  <button class="btn" id="refreshBtn">&#8635; Refresh</button>
+  <button class="btn" id="updateSessionBtn" title="Load financial snapshot (optional)">&#128200; Financial</button>
+  <button class="btn" id="refreshBtn">&#8635; Refresh Prices</button>
 </div>
 
-<!-- ── Status bar ───────────────────────────────────────────────────────── -->
+<!-- ── Status bar ───────────────────────────────────────────────────────────── -->
 <div class="sbar">
   <div class="spin" id="spin"></div>
   <span id="stext">Initializing…</span>
@@ -53,17 +48,46 @@
 <div class="main">
   <div id="errBox"></div>
 
-  <!-- Financial Snapshot -->
-  <div class="card" id="finCard" style="display:none">
+  <!-- ── Building Setup ───────────────────────────────────────────────────── -->
+  <div class="card" id="setupCard">
     <div class="card-head">
-      <span class="card-title">Financial Snapshot</span>
-      <span class="card-sub" id="finPeriod"></span>
+      <span class="card-title">My Buildings</span>
+      <span class="badge" id="bldCount">0</span>
+      <div class="ao-row">
+        <label class="ao-label">Admin Overhead:
+          <input type="number" id="aoInput" value="0" min="0" max="99" step="0.1" class="ao-inp">%
+        </label>
+      </div>
+      <button class="sbtn" id="clearBldBtn" style="margin-left:auto">Clear All</button>
     </div>
-    <div class="fin-grid" id="finGrid"></div>
-    <div id="txnWrap"></div>
+
+    <!-- Add building form -->
+    <div class="add-bld-row">
+      <select id="bldType" class="bld-sel"></select>
+      <select id="bldProduct" class="bld-sel"></select>
+      <input type="number" id="bldQty" value="1" min="1" class="bld-qty-inp" title="Number of buildings">
+      <button id="addBldBtn" class="btn btn-primary">+ Add</button>
+    </div>
+    <div id="addBldError" style="color:#fca5a5;font-size:12px;padding:0 16px 8px"></div>
+
+    <!-- Buildings table -->
+    <div class="tbl-wrap" id="bldTableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Building</th>
+            <th>Product</th>
+            <th class="num">Qty</th>
+            <th class="num">Output/day</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="bldTbody"></tbody>
+      </table>
+    </div>
   </div>
 
-  <!-- Surplus -->
+  <!-- ── Surplus ──────────────────────────────────────────────────────────── -->
   <div class="card" id="surCard" style="display:none">
     <div class="sec-head">
       <span class="dot dot-g"></span>
@@ -73,7 +97,7 @@
         <span>Sort:</span>
         <button class="sbtn" id="ss-net"  data-sort data-tbl="s" data-col="net"  data-dir="desc">Net Balance</button>
         <button class="sbtn" id="ss-name" data-sort data-tbl="s" data-col="name" data-dir="asc">Name</button>
-        <button class="sbtn active" id="ss-val" data-sort data-tbl="s" data-col="mv" data-dir="desc">Market Value</button>
+        <button class="sbtn active" id="ss-mv" data-sort data-tbl="s" data-col="mv" data-dir="desc">Market Value</button>
       </div>
     </div>
     <div class="tbl-wrap">
@@ -92,7 +116,7 @@
     </div>
   </div>
 
-  <!-- Deficit -->
+  <!-- ── Deficit ──────────────────────────────────────────────────────────── -->
   <div class="card" id="defCard" style="display:none">
     <div class="sec-head">
       <span class="dot dot-a"></span>
@@ -100,9 +124,9 @@
       <span class="badge" id="defCount">0</span>
       <div class="sort-wrap">
         <span>Sort:</span>
-        <button class="sbtn active" id="ds-net"  data-sort data-tbl="d" data-col="net"     data-dir="asc">Net Balance</button>
-        <button class="sbtn"        id="ds-name" data-sort data-tbl="d" data-col="name"    data-dir="asc">Name</button>
-        <button class="sbtn"        id="ds-buy"  data-sort data-tbl="d" data-col="buyCost" data-dir="desc">Buy Cost</button>
+        <button class="sbtn active" id="ds-buyCost" data-sort data-tbl="d" data-col="buyCost" data-dir="desc">Buy Cost</button>
+        <button class="sbtn"        id="ds-net"     data-sort data-tbl="d" data-col="net"     data-dir="asc">Net Balance</button>
+        <button class="sbtn"        id="ds-name"    data-sort data-tbl="d" data-col="name"    data-dir="asc">Name</button>
       </div>
     </div>
     <div class="tbl-wrap">
@@ -122,6 +146,17 @@
       </table>
     </div>
   </div>
+
+  <!-- ── Financial Snapshot (optional) ───────────────────────────────────── -->
+  <div class="card" id="finCard">
+    <div class="card-head">
+      <span class="card-title">Financial Snapshot</span>
+      <span class="card-sub">Optional — requires session cookie</span>
+      <button class="btn" id="loadFinBtn" style="margin-left:auto">Load Financial Data</button>
+    </div>
+    <div id="finContent" style="display:none"></div>
+  </div>
+
 </div>
 
 <script src="app.js"></script>
