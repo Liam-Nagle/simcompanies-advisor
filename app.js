@@ -160,8 +160,8 @@ const PROD = {
 const BLDS = [
   {k:'E', n:'Power Plant',                  w:414,   c:'production', maxLvl:2, o:[1]},
   {k:'W', n:'Water Reservoir',              w:345,   c:'production', maxLvl:2, o:[2]},
-  {k:'P', n:'Plantation',                   w:103.5, c:'production', maxLvl:3, o:[3,4,5,6,40,66,72,106,118,120,136]},
-  {k:'F', n:'Farm',                         w:138,   c:'production', maxLvl:2, o:[9,46,115,116,117]},
+  {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:3, o:[3,4,5,6,40,66,72,106,118,120,136]},
+  {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:2, o:[9,46,115,116,117]},
   {k:'M', n:'Mine',                         w:276,   c:'production', maxLvl:2, o:[14,15,68,42]},
   {k:'O', n:'Oil Rig',                      w:517.5, c:'production', maxLvl:2, o:[10,74]},
   {k:'Q', n:'Quarry',                       w:276,   c:'production', maxLvl:4, o:[44,104,105]},
