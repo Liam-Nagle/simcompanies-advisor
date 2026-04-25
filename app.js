@@ -285,6 +285,10 @@ const sortSt = {
   d: { col: 'buyCost', dir: 'desc' },
 };
 
+let oppLevel  = 1;
+let oppOwned  = false;
+let oppSearch = '';
+
 /* ─────────────────────────────────────────────────────────────────────────────
    STATUS / ERROR
 ───────────────────────────────────────────────────────────────────────────── */
@@ -478,7 +482,6 @@ function renderBuildingList() {
     return;
   }
 
-  const ao = aoMultiplier(getAO());
   tbody.innerHTML = playerBuildings.map((e, i) => {
     const bld      = BLDS.find(b => b.k === e.bk);
     const prod     = PROD[e.pk];
@@ -494,7 +497,7 @@ function renderBuildingList() {
                <span style="font-size:10px;color:var(--muted)">/day</span>`;
     } else {
       const psb = 1 + getPSB() / 100;
-      const ppd = prod ? prod.pph * lvl * e.qty * 24 * ao * psb : 0;
+      const ppd = prod ? prod.pph * lvl * e.qty * 24 * psb : 0;
       rateStr = `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
     }
     const profitCell = (() => {
@@ -504,7 +507,16 @@ function renderBuildingList() {
       const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
       const mkt2 = buildMarketMap();
       const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
-      return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}`;
+      let upgradeHint = '';
+      if (bld && lvl < (bld.maxLvl || 1)) {
+        const nxt = calcBuildingProfit(e.bk, e.pk, lvl + 1, e.qty);
+        if (nxt) {
+          const gain = nxt.profitDay - p.profitDay;
+          const gc = gain >= 0 ? 'var(--green)' : 'var(--red)';
+          upgradeHint = `<div style="font-size:10px;color:${gc};margin-top:2px;white-space:nowrap">&#x2191; Lvl ${lvl+1}: ${gain >= 0 ? '+' : ''}${fmtSC(gain)}/day</div>`;
+        }
+      }
+      return `<div><span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}</div>${upgradeHint}`;
     })();
     return `<tr class="bld-row">
       <td>${canDrill ? `<span class="tog" id="btog${i}" data-bld-tog="${i}">&#9658;</span>` : ''}</td>
@@ -540,19 +552,15 @@ function calcBuildingProfit(bk, pk, lvl, qty) {
   const prod = PROD[+pk];
   if (!bld || !prod || !ticker.length) return null;
   const mkt    = buildMarketMap();
-  const ao     = aoMultiplier(getAO());
   const psb    = 1 + getPSB() / 100;
   const l      = lvl || 1;
   const q      = qty || 1;
-  const pphEff = prod.pph * l * ao * psb;
+  const pphEff = prod.pph * l * psb;                            // AO does NOT reduce output
   const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
   const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;
   const matDay = pphEff * 24 * matCPU * q;
-  const wagDay = bld.w * l * 24 * q;
+  const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);     // AO adds to wage cost
   return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay };
-}
-function aoMultiplier(ao_pct) {
-  return Math.max(0, 1 - (ao_pct || 0) / 100);
 }
 
 function recalculate() {
@@ -568,7 +576,6 @@ function calculate() {
   const marketMap = {};
   for (const t of ticker) marketMap[+t.kind] = +(t.price || 0);
 
-  const ao   = aoMultiplier(getAO());
   const produced = {};
   const consumed = {};
 
@@ -585,7 +592,7 @@ function calculate() {
       consumed[+entry.pk] = (consumed[+entry.pk] || 0) + demand;
     } else {
       const psb      = 1 + getPSB() / 100;
-      const unitsDay = prod.pph * lvl * entry.qty * 24 * ao * psb;
+      const unitsDay = prod.pph * lvl * entry.qty * 24 * psb;
       produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
       for (const inp of prod.i) {
         consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
@@ -632,9 +639,8 @@ function calcMVB(kindId, deficitPerDay, marketMap) {
   const prod = PROD[+kindId];
   if (!prod) return null;
 
-  const ao       = aoMultiplier(getAO());
-  const effPph   = prod.pph * ao;
-  const wageCPU  = effPph > 0 ? bld.w / effPph : 0;
+  const effPph   = prod.pph;
+  const wageCPU  = effPph > 0 ? bld.w * (1 + getAO() / 100) / effPph : 0;
   let   matCPU   = 0;
   for (const inp of prod.i) {
     matCPU += inp.a * (marketMap[+inp.k] || 0);
@@ -645,11 +651,15 @@ function calcMVB(kindId, deficitPerDay, marketMap) {
   const makeTotal = makeCPU * deficitPerDay;
   const buyTotal  = buyCPU * deficitPerDay;
 
+  const bldP = calcBuildingProfit(bld.k, +kindId, 1, 1);
+
   return {
     makeCPU, buyCPU, makeTotal, buyTotal, wageCPU, matCPU,
     saving: Math.abs(makeTotal - buyTotal),
     deficitPerDay,
     bldName: bld.n,
+    bldKind: bld.k,
+    bldProfitDay: bldP ? bldP.profitDay : null,
   };
 }
 
@@ -759,6 +769,14 @@ function mvbDetail(r) {
       Market: ${fmtSC(m.buyCPU)}/unit &nbsp;&middot;&nbsp;
       Make cost: ${fmtSC(m.makeCPU)}/unit
     </div>
+    ${m.bldProfitDay !== null ? (() => {
+      const c = m.bldProfitDay >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:6px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="color:var(--muted)">Level 1 ${esc(m.bldName)} full profit:</span>
+        <strong style="color:${c}">${m.bldProfitDay >= 0 ? '+' : ''}${fmtSC(m.bldProfitDay)}/day</strong>
+        <span style="color:var(--muted)">— includes all production beyond your ${fmtN(m.deficitPerDay)}/day deficit</span>
+      </div>`;
+    })() : ''}
   </div>`;
 }
 
@@ -771,70 +789,113 @@ function buildProfitDetail(bk, pk, lvl, qty) {
   if (!bld || !prod || !ticker.length)
     return '<div class="detail-inner" style="color:var(--muted);font-size:12px">No data available.</div>';
 
-  const mkt     = buildMarketMap();
-  const ao      = aoMultiplier(getAO());
-  const psb     = 1 + getPSB() / 100;
-  const l       = lvl || 1;
-  const q       = qty || 1;
-  const pphEff  = prod.pph * l * ao * psb;
-  const unitDay = pphEff * 24 * q;
-  const price   = mkt[+pk] || 0;
-  const revDay  = unitDay * price;
-  const wagDay  = bld.w * l * 24 * q;
+  const mkt         = buildMarketMap();
+  const psb         = 1 + getPSB() / 100;
+  const ao          = getAO();
+  const l           = lvl || 1;
+  const q           = qty || 1;
+  const pphEff      = prod.pph * l * psb;            // AO does NOT reduce output
+  const unitDay     = pphEff * 24 * q;
+  const price       = mkt[+pk] || 0;
+  const revDay      = unitDay * price;
+
+  // Wage cost per unit = bld.w × (1 + AO%) / (pph × PSB)
+  const wagCPUBase  = prod.pph > 0 ? bld.w / (prod.pph * psb) : 0;
+  const aoCPU       = wagCPUBase * ao / 100;
+  const wagCPUTotal = wagCPUBase + aoCPU;
+  const wagBaseDay  = bld.w * l * 24 * q;
+  const aoWagDay    = wagBaseDay * ao / 100;
+  const wagDay      = wagBaseDay + aoWagDay;
 
   const inputs = prod.i.map(inp => ({
     k:    +inp.k,
     n:    PROD[+inp.k]?.n || `Resource #${inp.k}`,
     a:    inp.a,
     p:    mkt[+inp.k] || 0,
-    cDay: inp.a * pphEff * 24 * q * (mkt[+inp.k] || 0),
+    cpu:  inp.a * (mkt[+inp.k] || 0),
+    cDay: inp.a * unitDay * (mkt[+inp.k] || 0),
     zero: !mkt[+inp.k],
   }));
+  const matCPU  = inputs.reduce((s, i) => s + i.cpu, 0);
   const matDay  = inputs.reduce((s, i) => s + i.cDay, 0);
+  const profCPU = price - matCPU - wagCPUTotal;
   const profDay = revDay - matDay - wagDay;
+  const margin  = revDay > 0 ? profDay / revDay * 100 : 0;
   const pc      = profDay >= 0 ? 'var(--green)' : 'var(--red)';
 
-  const rateNote = [
-    fmtN(prod.pph * ao * psb) + '/hr',
-    l > 1 ? `Lvl ${l}` : null,
-    q > 1 ? `${q} bldgs` : null,
-  ].filter(Boolean).join(' × ') + ` = ${fmtN(unitDay)}/day`;
+  const basePph  = prod.pph * psb;
+  const lvlPph   = basePph * l;
+  const perBldDay = fmtN(basePph * l * 24);
+  const rateNote = l > 1
+    ? `${fmtN(basePph)}/hr × Lvl ${l} = ${fmtN(lvlPph)}/hr = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`
+    : `${fmtN(basePph)}/hr = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`;
+
+  const hdr = `
+    <div class="pb-row" style="border-bottom:1px solid var(--border);margin-bottom:4px;padding-bottom:4px">
+      <div class="pb-label" style="font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Item</div>
+      <div class="pb-price" style="font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Per Unit</div>
+      <div class="pb-amount" style="font-weight:600;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Per Day</div>
+    </div>`;
+
+  const revRow = `
+    <div class="pb-row">
+      <div class="pb-label">
+        ${iconHtml(+pk)}<strong>${esc(prod.n)}</strong>
+        <span style="color:var(--muted);font-size:10px;margin-left:4px">${rateNote}</span>
+      </div>
+      <div class="pb-price" style="color:var(--green)">${price ? '+' + fmtSC(price) : '<span style="color:var(--amber)">no price</span>'}</div>
+      <div class="pb-amount" style="color:var(--green)">+${fmtSC(revDay)}</div>
+    </div>`;
 
   const inputRows = inputs.map(inp => `
     <div class="pb-row">
       <div class="pb-label" style="padding-left:18px;color:var(--muted)">
         ${iconHtml(inp.k)}${esc(inp.n)}
-        <span style="opacity:.5;font-size:10px">(${fmtN(inp.a)}× per unit)</span>
+        <span style="opacity:.5;font-size:10px">${fmtN(inp.a)}× per unit</span>
         ${inp.zero ? `<span style="color:var(--amber)" title="No market price — treated as $0">⚠</span>` : ''}
       </div>
-      <div class="pb-price">${inp.zero ? '<span style="color:var(--amber)">no price</span>' : fmtSC(inp.p) + '/unit'}</div>
-      <div class="pb-amount" style="color:var(--red)">−${fmtSC(inp.cDay)}/day</div>
+      <div class="pb-price">${inp.zero ? '<span style="color:var(--amber)">no price</span>' : '−' + fmtSC(inp.cpu)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(inp.cDay)}</div>
     </div>`).join('');
+
+  const wagRow = `
+    <div class="pb-row">
+      <div class="pb-label" style="color:var(--muted)">
+        Wages (${esc(bld.n)}${l > 1 ? ' Lvl ' + l : ''}${q > 1 ? ' ×' + q : ''})
+        <span style="opacity:.5;font-size:10px">${fmtSC(bld.w * l)}/hr</span>
+      </div>
+      <div class="pb-price">−${fmtSC(wagCPUBase)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(wagBaseDay)}</div>
+    </div>`;
+
+  const aoRow = ao > 0 ? `
+    <div class="pb-row">
+      <div class="pb-label" style="color:var(--muted);padding-left:18px">
+        Admin Overhead (${ao}%)
+      </div>
+      <div class="pb-price">−${fmtSC(aoCPU)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(aoWagDay)}</div>
+    </div>` : '';
+
+  const profRow = `
+    <div class="pb-row">
+      <div class="pb-label" style="font-size:13px;font-weight:700">
+        Profit / day
+        <span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:6px">${margin.toFixed(1)}% margin</span>
+      </div>
+      <div class="pb-price" style="color:${pc};font-weight:600">${profCPU >= 0 ? '+' : ''}${fmtSC(profCPU)}</div>
+      <div class="pb-amount" style="font-size:14px;color:${pc}">${profDay >= 0 ? '+' : ''}${fmtSC(profDay)}</div>
+    </div>`;
 
   return `<div class="detail-inner">
     <div class="profit-breakdown">
-      <div class="pb-row">
-        <div class="pb-label">
-          ${iconHtml(+pk)}<strong>${esc(prod.n)}</strong>
-          <span style="color:var(--muted);font-weight:400;font-size:10px">${rateNote}</span>
-        </div>
-        <div class="pb-price">${price ? fmtSC(price) + '/unit' : '<span style="color:var(--amber)">no price</span>'}</div>
-        <div class="pb-amount" style="color:var(--green)">+${fmtSC(revDay)}/day</div>
-      </div>
+      ${hdr}
+      ${revRow}
       ${inputRows}
-      <div class="pb-row">
-        <div class="pb-label" style="color:var(--muted)">
-          Wages (${esc(bld.n)}${l > 1 ? ' Lvl ' + l : ''}${q > 1 ? ' ×' + q : ''})
-        </div>
-        <div class="pb-price">${fmtSC(bld.w * l)}/hr</div>
-        <div class="pb-amount" style="color:var(--red)">−${fmtSC(wagDay)}/day</div>
-      </div>
+      ${wagRow}
+      ${aoRow}
       <div class="pb-divider"></div>
-      <div class="pb-row">
-        <div class="pb-label" style="font-size:13px;font-weight:700">Profit / day</div>
-        <div></div>
-        <div class="pb-amount" style="font-size:14px;color:${pc}">${profDay >= 0 ? '+' : ''}${fmtSC(profDay)}/day</div>
-      </div>
+      ${profRow}
     </div>
   </div>`;
 }
@@ -846,9 +907,10 @@ function renderOpportunities() {
   const card = document.getElementById('oppCard');
   if (!ticker.length) { card.style.display = 'none'; return; }
 
-  const mkt = buildMarketMap();
-  const ao  = aoMultiplier(getAO());
-  const psb = 1 + getPSB() / 100;
+  const mkt    = buildMarketMap();
+  const psb    = 1 + getPSB() / 100;
+  const lvl    = oppLevel;
+  const search = oppSearch.toLowerCase();
 
   const rows = [];
   for (const bld of BLDS) {
@@ -856,21 +918,30 @@ function renderOpportunities() {
     for (const pk of bld.o) {
       const prod = PROD[pk];
       if (!prod) continue;
-      const pphEff  = prod.pph * ao * psb;
+      const pphEff  = prod.pph * lvl * psb;
       const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
       const revDay  = pphEff * 24 * (mkt[+pk] || 0);
       const matDay  = pphEff * 24 * matCPU;
-      const wagDay  = bld.w * 24;
+      const wagDay  = bld.w * lvl * 24 * (1 + getAO() / 100);
       const profDay = revDay - matDay - wagDay;
       const owned         = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
       const missingInputs = prod.i.some(inp => !mkt[+inp.k]);
-      rows.push({ bldName: bld.n, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned, missingInputs });
+      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned, missingInputs });
     }
   }
-  rows.sort((a, b) => b.profDay - a.profDay);
+
+  let filtered = rows;
+  if (oppOwned)  filtered = filtered.filter(r => r.owned);
+  if (search)    filtered = filtered.filter(r =>
+    r.bldName.toLowerCase().includes(search) || r.prodName.toLowerCase().includes(search)
+  );
+  filtered.sort((a, b) => b.profDay - a.profDay);
+
+  document.getElementById('oppSub').textContent =
+    `Level ${lvl} · 1 building · current market prices${filtered.length !== rows.length ? ` · ${filtered.length} shown` : ''}`;
 
   card.style.display = 'block';
-  document.getElementById('oppTbody').innerHTML = rows.map((r, i) => {
+  document.getElementById('oppTbody').innerHTML = filtered.map((r, i) => {
     const pc   = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
     const bg   = r.owned ? 'background:rgba(34,197,94,.05);' : '';
     const warn = r.missingInputs
@@ -911,9 +982,26 @@ document.getElementById('oppTbody').addEventListener('click', e => {
   const i   = row.dataset.idx;
   const det = document.getElementById('odet' + i);
   const tog = document.getElementById('otog' + i);
-  det.querySelector('td').innerHTML = buildProfitDetail(row.dataset.bk, parseInt(row.dataset.pk), 1, 1);
+  det.querySelector('td').innerHTML = buildProfitDetail(row.dataset.bk, parseInt(row.dataset.pk), oppLevel, 1);
   det.classList.toggle('hide');
   tog.classList.toggle('open', !det.classList.contains('hide'));
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BUILDING PROFITABILITY CONTROLS
+───────────────────────────────────────────────────────────────────────────── */
+document.getElementById('oppLevel').addEventListener('input', e => {
+  oppLevel = Math.max(1, parseInt(e.target.value) || 1);
+  renderOpportunities();
+});
+document.getElementById('oppSearch').addEventListener('input', e => {
+  oppSearch = e.target.value;
+  renderOpportunities();
+});
+document.getElementById('oppOwnedBtn').addEventListener('click', () => {
+  oppOwned = !oppOwned;
+  document.getElementById('oppOwnedBtn').classList.toggle('active', oppOwned);
+  renderOpportunities();
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -955,6 +1043,31 @@ function updateSummary() {
   }, 0);
   const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
 
+  // Best upgrade: building where +1 level gives the most additional profit/day
+  const best = playerBuildings
+    .map(e => {
+      const bld2 = BLDS.find(b => b.k === e.bk);
+      if (!bld2 || bld2.c !== 'production') return null;
+      const lv = e.lvl || 1;
+      if (lv >= bld2.maxLvl) return null;
+      const curr = calcBuildingProfit(e.bk, e.pk, lv, e.qty);
+      const next = calcBuildingProfit(e.bk, e.pk, lv + 1, e.qty);
+      if (!curr || !next) return null;
+      return { gain: next.profitDay - curr.profitDay, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.gain - a.gain)[0] || null;
+
+  const bestTile = best ? `
+    <div class="sum-tile" style="min-width:170px">
+      <div class="sum-lbl" style="color:var(--amber)">Best Upgrade &#x2191;</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin:3px 0 1px">${esc(best.bldName)}</div>
+      <div style="font-size:11px;color:var(--muted)">${esc(best.prodName)}</div>
+      <div style="font-size:13px;font-weight:700;margin-top:4px;color:${best.gain >= 0 ? 'var(--green)' : 'var(--red)'}">
+        Lvl ${best.lv}&#x2192;${best.lv + 1}: ${best.gain >= 0 ? '+' : ''}${fmtSC(best.gain)}/day
+      </div>
+    </div>` : '';
+
   strip.className = 'sum-strip';
   strip.style.display = '';
   strip.innerHTML = `
@@ -977,7 +1090,8 @@ function updateSummary() {
     <div class="sum-tile" style="border-color:${profitColor}">
       <div class="sum-lbl">Profit / Day</div>
       <div class="sum-val" style="color:${profitColor}">${totalProfit >= 0 ? '+' : ''}${fmtSC(totalProfit)}</div>
-    </div>`;
+    </div>
+    ${bestTile}`;
 
   document.getElementById('spin').style.display = 'none';
   if (tickerAge !== null) {

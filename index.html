@@ -167,7 +167,15 @@
     <div class="sec-head">
       <span class="dot dot-g"></span>
       <span class="sec-title">Building Profitability</span>
-      <span class="card-sub">Level 1 · 1 building · current market prices</span>
+      <span class="card-sub" id="oppSub">Level 1 · 1 building · current market prices</span>
+      <div class="sort-wrap" style="margin-left:auto;gap:8px">
+        <label class="ao-label">Level
+          <input type="number" id="oppLevel" value="1" min="1" max="15" class="ao-inp" style="width:44px">
+        </label>
+        <input id="oppSearch" type="search" placeholder="Filter…"
+               style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 8px;font-size:11px;width:120px;outline:none;color-scheme:dark">
+        <button class="sbtn" id="oppOwnedBtn">Owned only</button>
+      </div>
     </div>
     <div class="tbl-wrap">
       <table>
