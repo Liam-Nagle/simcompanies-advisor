@@ -47,6 +47,7 @@
 
 <div class="main">
   <div id="errBox"></div>
+  <div id="summaryStrip" style="display:none"></div>
 
   <!-- ── Building Setup ───────────────────────────────────────────────────── -->
   <div class="card" id="setupCard">
@@ -81,6 +82,7 @@
             <th class="num">Lvl</th>
             <th class="num">Qty</th>
             <th class="num">Rate/day</th>
+            <th class="num">Profit/day</th>
             <th></th>
           </tr>
         </thead>
@@ -145,6 +147,29 @@
           </tr>
         </thead>
         <tbody id="defTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Building Profitability ──────────────────────────────────────────── -->
+  <div class="card" id="oppCard" style="display:none">
+    <div class="sec-head">
+      <span class="dot dot-g"></span>
+      <span class="sec-title">Building Profitability</span>
+      <span class="card-sub">Level 1 · 1 building · current market prices</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Building</th>
+            <th>Product</th>
+            <th class="num">Revenue/day</th>
+            <th class="num">Costs/day</th>
+            <th class="num">Profit/day</th>
+          </tr>
+        </thead>
+        <tbody id="oppTbody"></tbody>
       </table>
     </div>
   </div>

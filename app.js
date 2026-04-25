@@ -449,7 +449,7 @@ function renderBuildingList() {
   count.textContent = playerBuildings.length;
 
   if (!playerBuildings.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:14px 12px;font-size:12px">
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);padding:14px 12px;font-size:12px">
       No buildings added yet. Use the form above to add your buildings.
     </td></tr>`;
     return;
@@ -485,6 +485,13 @@ function renderBuildingList() {
                data-qty-idx="${i}" style="width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
       </td>
       <td class="num" style="font-size:11px">${rateStr}</td>
+      <td class="num" style="font-size:11px">${(() => {
+        if (isRetail) return `<span style="color:var(--muted)">—</span>`;
+        const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty);
+        if (!p) return `<span style="color:var(--muted)">—</span>`;
+        const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>`;
+      })()}</td>
       <td style="text-align:right"><button class="sbtn" data-remove="${i}" title="Remove">&#10005;</button></td>
     </tr>`;
   }).join('');
@@ -493,6 +500,27 @@ function renderBuildingList() {
 /* ─────────────────────────────────────────────────────────────────────────────
    CALCULATION ENGINE
 ───────────────────────────────────────────────────────────────────────────── */
+function buildMarketMap() {
+  const m = {};
+  for (const t of ticker) m[+t.kind] = +(t.price || 0);
+  return m;
+}
+
+function calcBuildingProfit(bk, pk, lvl, qty) {
+  const bld  = BLDS.find(b => b.k === bk);
+  const prod = PROD[+pk];
+  if (!bld || !prod || !ticker.length) return null;
+  const mkt    = buildMarketMap();
+  const ao     = aoMultiplier(getAO());
+  const l      = lvl || 1;
+  const q      = qty || 1;
+  const pphEff = prod.pph * l * ao;
+  const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+  const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;
+  const matDay = pphEff * 24 * matCPU * q;
+  const wagDay = bld.w * l * 24 * q;
+  return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay };
+}
 function aoMultiplier(ao_pct) {
   return Math.max(0, 1 - (ao_pct || 0) / 100);
 }
@@ -503,6 +531,7 @@ function recalculate() {
   renderSurplus();
   renderDeficit();
   updateSummary();
+  renderOpportunities();
 }
 
 function calculate() {
@@ -702,6 +731,48 @@ function mvbDetail(r) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   RENDER — BUILDING PROFITABILITY
+───────────────────────────────────────────────────────────────────────────── */
+function renderOpportunities() {
+  const card = document.getElementById('oppCard');
+  if (!ticker.length) { card.style.display = 'none'; return; }
+
+  const mkt = buildMarketMap();
+  const ao  = aoMultiplier(getAO());
+
+  const rows = [];
+  for (const bld of BLDS) {
+    if (bld.c === 'retail') continue;
+    for (const pk of bld.o) {
+      const prod = PROD[pk];
+      if (!prod) continue;
+      const pphEff  = prod.pph * ao;
+      const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+      const revDay  = pphEff * 24 * (mkt[+pk] || 0);
+      const matDay  = pphEff * 24 * matCPU;
+      const wagDay  = bld.w * 24;
+      const profDay = revDay - matDay - wagDay;
+      const owned   = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
+      rows.push({ bldName: bld.n, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned });
+    }
+  }
+  rows.sort((a, b) => b.profDay - a.profDay);
+
+  card.style.display = 'block';
+  document.getElementById('oppTbody').innerHTML = rows.map(r => {
+    const pc  = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
+    const bg  = r.owned ? 'background:rgba(34,197,94,.05);' : '';
+    return `<tr style="${bg}">
+      <td>${esc(r.bldName)}${r.owned ? ' <span class="badge" style="color:var(--green);border-color:var(--green)">owned</span>' : ''}</td>
+      <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
+      <td class="num" style="color:var(--muted)">${fmtSC(r.revDay)}/day</td>
+      <td class="num" style="color:var(--muted)">${fmtSC(r.matDay + r.wagDay)}/day</td>
+      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    EVENT DELEGATION — deficit rows
 ───────────────────────────────────────────────────────────────────────────── */
 document.getElementById('defTbody').addEventListener('click', e => {
@@ -733,25 +804,44 @@ document.querySelectorAll('th[data-sort-tbl]').forEach(th => {
    SUMMARY LINE
 ───────────────────────────────────────────────────────────────────────────── */
 function updateSummary() {
+  const strip = document.getElementById('summaryStrip');
   if (!playerBuildings.length) {
     status('No buildings configured — add your buildings in the panel above.', false);
     setRight('');
+    strip.style.display = 'none';
     return;
   }
-  const totalMV   = surRows.reduce((s, r) => s + r.mv, 0);
-  const totalDef  = defRows.reduce((s, r) => s + r.buyCost, 0);
-  const net       = totalMV - totalDef;
-  const netColor  = net >= 0 ? 'var(--green)' : 'var(--red)';
-  document.getElementById('stext').innerHTML =
-    `${playerBuildings.length} building${playerBuildings.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp; ` +
-    `${surRows.length} surplus &nbsp;&middot;&nbsp; ` +
-    `${defRows.length} deficit &nbsp;&middot;&nbsp; ` +
-    `Net: <span style="color:${netColor};font-weight:600">${net >= 0 ? '+' : ''}${fmtSC(net)}/day</span>`;
+  const totalMV  = surRows.reduce((s, r) => s + r.mv, 0);
+  const totalDef = defRows.reduce((s, r) => s + r.buyCost, 0);
+  const net      = totalMV - totalDef;
+  const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+  strip.className = 'sum-strip';
+  strip.style.display = '';
+  strip.innerHTML = `
+    <div class="sum-tile">
+      <div class="sum-lbl">Buildings</div>
+      <div class="sum-val">${playerBuildings.length}</div>
+    </div>
+    <div class="sum-tile">
+      <div class="sum-lbl">Surplus Items</div>
+      <div class="sum-val" style="color:var(--green)">${surRows.length}</div>
+    </div>
+    <div class="sum-tile">
+      <div class="sum-lbl">Deficit Items</div>
+      <div class="sum-val" style="color:${defRows.length ? 'var(--amber)' : 'var(--muted)'}">${defRows.length}</div>
+    </div>
+    <div class="sum-tile" style="border-color:${netColor}">
+      <div class="sum-lbl">Net / Day</div>
+      <div class="sum-val" style="color:${netColor}">${net >= 0 ? '+' : ''}${fmtSC(net)}</div>
+    </div>`;
+
   document.getElementById('spin').style.display = 'none';
   if (tickerAge !== null) {
     const mins = Math.ceil(tickerAge / 60);
     setRight(`Prices ${tickerAge < 60 ? tickerAge + 's' : mins + 'm'} old`);
   }
+  document.getElementById('stext').textContent = '';
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

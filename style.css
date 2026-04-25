@@ -142,6 +142,12 @@ tbody tr:hover{background:rgba(255,255,255,.018)}
 .ao-inp{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;width:54px;text-align:right}
 .ao-inp:focus{outline:none;border-color:var(--blue)}
 
+/* ── Summary strip ──────────────────────────────────────────────────── */
+.sum-strip{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.sum-tile{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;flex:1;min-width:130px;text-align:center}
+.sum-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.sum-val{font-size:28px;font-weight:700;line-height:1.1}
+
 /* ── Mobile ─────────────────────────────────────────────────────────── */
 @media(max-width:560px){
   .main{padding:10px}
