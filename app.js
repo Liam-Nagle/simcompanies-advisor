@@ -3,9 +3,10 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    CONFIG
 ───────────────────────────────────────────────────────────────────────────── */
-const PROXY_URL = 'https://simcompanies-advisor.onrender.com';
-const BASE      = 'https://www.simcompanies.com';
-const TTL       = 5 * 60 * 1000;
+const PROXY_URL  = 'https://simcompanies-advisor.onrender.com';
+const BASE       = 'https://www.simcompanies.com';
+const TTL        = 5 * 60 * 1000;
+const ENCYC_TTL  = 6 * 60 * 60 * 1000;
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ENCYCLOPEDIA
@@ -156,44 +157,44 @@ const PROD = {
  145: {n:'Recipes',                pph:3.81,    i:[]},
 };
 
-// maxLvl derived from images arrays in the SimCompanies encyclopedia
+// maxLvl sourced from /api/v2/constants/buildings/ levelImages array lengths
 const BLDS = [
-  {k:'E', n:'Power Plant',                  w:414,   c:'production', maxLvl:2, o:[1]},
-  {k:'W', n:'Water Reservoir',              w:345,   c:'production', maxLvl:2, o:[2]},
-  {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:3, o:[3,4,5,6,40,66,72,106,118,120,136]},
-  {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:2, o:[9,46,115,116,117]},
-  {k:'M', n:'Mine',                         w:276,   c:'production', maxLvl:2, o:[14,15,68,42]},
-  {k:'O', n:'Oil Rig',                      w:517.5, c:'production', maxLvl:2, o:[10,74]},
-  {k:'Q', n:'Quarry',                       w:276,   c:'production', maxLvl:4, o:[44,104,105]},
-  {k:'S', n:'Shipping Depot',               w:310.5, c:'production', maxLvl:2, o:[13]},
-  {k:'Y', n:'Factory',                      w:414,   c:'production', maxLvl:2, o:[16,17,18,69,43,45,76,67]},
-  {k:'R', n:'Refinery',                     w:483,   c:'production', maxLvl:2, o:[11,12,19,75,83]},
-  {k:'L', n:'Electronics Factory',          w:379.5, c:'production', maxLvl:3, o:[20,21,22,23,24,25,26,27,28,114,47,79]},
-  {k:'T', n:'Fashion Factory',              w:138,   c:'production', maxLvl:2, o:[41,60,61,62,63,64,65,70,71]},
-  {k:'1', n:'Car Factory',                  w:448.5, c:'production', maxLvl:2, o:[49,50,51,53,54,55,56,57,112]},
-  {k:'D', n:'Propulsion Factory',           w:621,   c:'production', maxLvl:3, o:[48,52,85,86,88,89]},
-  {k:'7', n:'Aerospace Factory',            w:586.5, c:'production', maxLvl:3, o:[77,78,84,87,90,92,93]},
-  {k:'8', n:'Aerospace Electronics',        w:724.5, c:'production', maxLvl:3, o:[80,81,82,98,99]},
-  {k:'9', n:'Vertical Integration Facility',w:759,   c:'production', maxLvl:3, o:[91,94]},
-  {k:'0', n:'Hangar',                       w:759,   c:'production', maxLvl:3, o:[95,96,97]},
-  {k:'o', n:'Concrete Plant',               w:379.5, c:'production', maxLvl:3, o:[101,102,103]},
-  {k:'x', n:'Construction Factory',         w:483,   c:'production', maxLvl:4, o:[107,108,109,110]},
-  {k:'g', n:'General Contractor',           w:345,   c:'production', maxLvl:3, o:[111]},
-  {k:'e', n:'Slaughterhouse',               w:414,   c:'production', maxLvl:3, o:[7,8]},
-  {k:'i', n:'Mill',                         w:379.5, c:'production', maxLvl:3, o:[119,133,139]},
-  {k:'j', n:'Bakery',                       w:448.5, c:'production', maxLvl:3, o:[137,121,123]},
-  {k:'m', n:'Catering',                     w:655.5, c:'production', maxLvl:3, o:[138,129,130,131,142,132,143]},
-  {k:'k', n:'Food Processing Plant',        w:379.5, c:'production', maxLvl:3, o:[141,128,134,122,135,127,140]},
-  {k:'6', n:'Beverage Factory',             w:241.5, c:'production', maxLvl:3, o:[73,124,125,126]},
-  {k:'p', n:'Plant Research Center',        w:448.5, c:'research',   maxLvl:1, o:[29]},
-  {k:'h', n:'Physics Laboratory',           w:586.5, c:'research',   maxLvl:3, o:[30,31,32]},
-  {k:'b', n:'Breeding Laboratory',          w:414,   c:'research',   maxLvl:3, o:[33]},
-  {k:'c', n:'Chemistry Laboratory',         w:414,   c:'research',   maxLvl:3, o:[34,113]},
-  {k:'a', n:'Automotive R&D',               w:552,   c:'research',   maxLvl:3, o:[58]},
-  {k:'f', n:'Fashion & Design',             w:448.5, c:'research',   maxLvl:3, o:[59]},
-  {k:'s', n:'Software R&D',                 w:448.5, c:'research',   maxLvl:3, o:[35]},
-  {k:'l', n:'Launch Pad',                   w:724.5, c:'research',   maxLvl:3, o:[100]},
-  {k:'q', n:'Kitchen',                      w:517.5, c:'research',   maxLvl:3, o:[145]},
+  {k:'E', n:'Power Plant',                   w:414,   c:'production', maxLvl:15, o:[1]},
+  {k:'W', n:'Water Reservoir',               w:345,   c:'production', maxLvl:15, o:[2]},
+  {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:15, o:[3,4,5,6,40,66,72,106,118,120,136]},
+  {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:6,  o:[9,46,115,116,117]},
+  {k:'M', n:'Mine',                          w:276,   c:'production', maxLvl:15, o:[14,15,68,42]},
+  {k:'O', n:'Oil Rig',                       w:517.5, c:'production', maxLvl:15, o:[10,74]},
+  {k:'Q', n:'Quarry',                        w:276,   c:'production', maxLvl:15, o:[44,104,105]},
+  {k:'S', n:'Shipping Depot',                w:310.5, c:'production', maxLvl:6,  o:[13]},
+  {k:'Y', n:'Factory',                       w:414,   c:'production', maxLvl:15, o:[16,17,18,69,43,45,76,67]},
+  {k:'R', n:'Refinery',                      w:483,   c:'production', maxLvl:6,  o:[11,12,19,75,83]},
+  {k:'L', n:'Electronics Factory',           w:379.5, c:'production', maxLvl:15, o:[20,21,22,23,24,25,26,27,28,114,47,79]},
+  {k:'T', n:'Fashion Factory',               w:138,   c:'production', maxLvl:6,  o:[41,60,61,62,63,64,65,70,71]},
+  {k:'1', n:'Car Factory',                   w:448.5, c:'production', maxLvl:5,  o:[49,50,51,53,54,55,56,57,112]},
+  {k:'D', n:'Propulsion Factory',            w:621,   c:'production', maxLvl:15, o:[48,52,85,86,88,89]},
+  {k:'7', n:'Aerospace Factory',             w:586.5, c:'production', maxLvl:15, o:[77,78,84,87,90,92,93]},
+  {k:'8', n:'Aerospace Electronics',         w:724.5, c:'production', maxLvl:15, o:[80,81,82,98,99]},
+  {k:'9', n:'Vertical Integration Facility', w:759,   c:'production', maxLvl:15, o:[91,94]},
+  {k:'0', n:'Hangar',                        w:759,   c:'production', maxLvl:15, o:[95,96,97]},
+  {k:'o', n:'Concrete Plant',                w:379.5, c:'production', maxLvl:15, o:[101,102,103]},
+  {k:'x', n:'Construction Factory',          w:483,   c:'production', maxLvl:15, o:[107,108,109,110]},
+  {k:'g', n:'General Contractor',            w:345,   c:'production', maxLvl:15, o:[111]},
+  {k:'e', n:'Slaughterhouse',                w:414,   c:'production', maxLvl:15, o:[7,8]},
+  {k:'i', n:'Mill',                          w:379.5, c:'production', maxLvl:15, o:[119,133,139]},
+  {k:'j', n:'Bakery',                        w:448.5, c:'production', maxLvl:15, o:[137,121,123]},
+  {k:'m', n:'Catering',                      w:655.5, c:'production', maxLvl:15, o:[138,129,130,131,142,132,143]},
+  {k:'k', n:'Food Processing Plant',         w:379.5, c:'production', maxLvl:15, o:[141,128,134,122,135,127,140]},
+  {k:'6', n:'Beverage Factory',              w:241.5, c:'production', maxLvl:15, o:[73,124,125,126]},
+  {k:'p', n:'Plant Research Center',         w:448.5, c:'research',   maxLvl:1,  o:[29]},
+  {k:'h', n:'Physics Laboratory',            w:586.5, c:'research',   maxLvl:3,  o:[30,31,32]},
+  {k:'b', n:'Breeding Laboratory',           w:414,   c:'research',   maxLvl:3,  o:[33]},
+  {k:'c', n:'Chemistry Laboratory',          w:414,   c:'research',   maxLvl:3,  o:[34,113]},
+  {k:'a', n:'Automotive R&D',                w:552,   c:'research',   maxLvl:3,  o:[58]},
+  {k:'f', n:'Fashion & Design',              w:448.5, c:'research',   maxLvl:3,  o:[59]},
+  {k:'s', n:'Software R&D',                  w:448.5, c:'research',   maxLvl:3,  o:[35]},
+  {k:'l', n:'Launch Pad',                    w:724.5, c:'research',   maxLvl:3,  o:[100]},
+  {k:'q', n:'Kitchen',                       w:517.5, c:'research',   maxLvl:3,  o:[145]},
   // Retail/sale buildings — rpph is estimated units sold per hour per level
   {k:'G', n:'Grocery Store',     w:138,   c:'retail', maxLvl:3, rpph:100, o:[121,117,122,9,120,134,124,125,126,119,3,4,5,6,72]},
   {k:'N', n:'Restaurant',        w:207,   c:'retail', maxLvl:3, rpph:10,  o:[129,127,130,131,132,142,143]},
@@ -206,12 +207,12 @@ const BLDS = [
 /* ─────────────────────────────────────────────────────────────────────────────
    CACHE
 ───────────────────────────────────────────────────────────────────────────── */
-function cGet(k) {
+function cGet(k, ttl = TTL) {
   try {
     const raw = localStorage.getItem('sc_' + k);
     if (!raw) return null;
     const { d, t } = JSON.parse(raw);
-    return (Date.now() - t < TTL) ? d : null;
+    return (Date.now() - t < ttl) ? d : null;
   } catch { return null; }
 }
 function cSet(k, d) {
@@ -270,12 +271,12 @@ function savePlayerBuildings(arr) {
 
 let playerBuildings = loadPlayerBuildings();
 
-function getAO() {
-  return parseFloat(localStorage.getItem('sc_ao') || '0') || 0;
-}
-function setAO(v) {
-  localStorage.setItem('sc_ao', String(v));
-}
+function getAO()  { return parseFloat(localStorage.getItem('sc_ao')  || '0') || 0; }
+function setAO(v)  { localStorage.setItem('sc_ao',  String(v)); }
+function getPSB() { return parseFloat(localStorage.getItem('sc_psb') || '0') || 0; }
+function setPSB(v) { localStorage.setItem('sc_psb', String(v)); }
+function getSSB() { return parseFloat(localStorage.getItem('sc_ssb') || '0') || 0; }
+function setSSB(v) { localStorage.setItem('sc_ssb', String(v)); }
 
 let surRows = [];
 let defRows = [];
@@ -399,6 +400,14 @@ document.getElementById('aoInput').addEventListener('input', e => {
   setAO(parseFloat(e.target.value) || 0);
   recalculate();
 });
+document.getElementById('psbInput').addEventListener('input', e => {
+  setPSB(parseFloat(e.target.value) || 0);
+  recalculate();
+});
+document.getElementById('ssbInput').addEventListener('input', e => {
+  setSSB(parseFloat(e.target.value) || 0);
+  recalculate();
+});
 
 document.getElementById('bldTbody').addEventListener('click', e => {
   const btn = e.target.closest('[data-remove]');
@@ -464,13 +473,15 @@ function renderBuildingList() {
     const isRetail = bld?.c === 'retail';
     let rateStr;
     if (isRetail) {
-      const rate = e.targetRate != null ? e.targetRate : ((bld.rpph || 0) * lvl * 24);
-      rateStr = `<input type="number" class="qty-inp" value="${Math.round(rate)}" min="0"
+      const ssb  = 1 + getSSB() / 100;
+      const rate = (e.targetRate != null ? e.targetRate : ((bld.rpph || 0) * lvl * 24)) * ssb;
+      rateStr = `<input type="number" class="qty-inp" value="${Math.round(e.targetRate ?? (bld.rpph || 0) * lvl * 24)}" min="0"
                data-rate-idx="${i}" title="Units sold per day per building — edit to match your in-game rate"
                style="width:70px;background:var(--bg3);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
                <span style="font-size:10px;color:var(--muted)">/day</span>`;
     } else {
-      const ppd = prod ? prod.pph * lvl * e.qty * 24 * ao : 0;
+      const psb = 1 + getPSB() / 100;
+      const ppd = prod ? prod.pph * lvl * e.qty * 24 * ao * psb : 0;
       rateStr = `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
     }
     return `<tr>
@@ -490,7 +501,9 @@ function renderBuildingList() {
         const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty);
         if (!p) return `<span style="color:var(--muted)">—</span>`;
         const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
-        return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>`;
+        const mkt2 = buildMarketMap();
+        const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
+        return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}`;
       })()}</td>
       <td style="text-align:right"><button class="sbtn" data-remove="${i}" title="Remove">&#10005;</button></td>
     </tr>`;
@@ -512,9 +525,10 @@ function calcBuildingProfit(bk, pk, lvl, qty) {
   if (!bld || !prod || !ticker.length) return null;
   const mkt    = buildMarketMap();
   const ao     = aoMultiplier(getAO());
+  const psb    = 1 + getPSB() / 100;
   const l      = lvl || 1;
   const q      = qty || 1;
-  const pphEff = prod.pph * l * ao;
+  const pphEff = prod.pph * l * ao * psb;
   const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
   const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;
   const matDay = pphEff * 24 * matCPU * q;
@@ -549,11 +563,13 @@ function calculate() {
     const lvl = entry.lvl || 1;
 
     if (bld?.c === 'retail') {
-      const rate = entry.targetRate != null ? entry.targetRate : ((bld?.rpph || 0) * lvl * 24);
-      const demand = rate * entry.qty;
+      const ssb    = 1 + getSSB() / 100;
+      const rate   = entry.targetRate != null ? entry.targetRate : ((bld?.rpph || 0) * lvl * 24);
+      const demand = rate * entry.qty * ssb;
       consumed[+entry.pk] = (consumed[+entry.pk] || 0) + demand;
     } else {
-      const unitsDay = prod.pph * lvl * entry.qty * 24 * ao;
+      const psb      = 1 + getPSB() / 100;
+      const unitsDay = prod.pph * lvl * entry.qty * 24 * ao * psb;
       produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
       for (const inp of prod.i) {
         consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
@@ -739,6 +755,7 @@ function renderOpportunities() {
 
   const mkt = buildMarketMap();
   const ao  = aoMultiplier(getAO());
+  const psb = 1 + getPSB() / 100;
 
   const rows = [];
   for (const bld of BLDS) {
@@ -746,14 +763,15 @@ function renderOpportunities() {
     for (const pk of bld.o) {
       const prod = PROD[pk];
       if (!prod) continue;
-      const pphEff  = prod.pph * ao;
+      const pphEff  = prod.pph * ao * psb;
       const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
       const revDay  = pphEff * 24 * (mkt[+pk] || 0);
       const matDay  = pphEff * 24 * matCPU;
       const wagDay  = bld.w * 24;
       const profDay = revDay - matDay - wagDay;
-      const owned   = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
-      rows.push({ bldName: bld.n, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned });
+      const owned         = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
+      const missingInputs = prod.i.some(inp => !mkt[+inp.k]);
+      rows.push({ bldName: bld.n, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned, missingInputs });
     }
   }
   rows.sort((a, b) => b.profDay - a.profDay);
@@ -767,7 +785,7 @@ function renderOpportunities() {
       <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.revDay)}/day</td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.matDay + r.wagDay)}/day</td>
-      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day</td>
+      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day${r.missingInputs ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : ''}</td>
     </tr>`;
   }).join('');
 }
@@ -842,6 +860,81 @@ function updateSummary() {
     setRight(`Prices ${tickerAge < 60 ? tickerAge + 's' : mins + 'm'} old`);
   }
   document.getElementById('stext').textContent = '';
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BUILDING CONSTANTS  (wages, maxLvl from live API, cached 6h)
+───────────────────────────────────────────────────────────────────────────── */
+function applyBuildingConstants(data) {
+  for (const b of data) {
+    const letter = b.db_letter != null ? String(b.db_letter) : null;
+    if (!letter) continue;
+    const bld = BLDS.find(x => x.k === letter);
+    if (!bld) continue;
+    if (Array.isArray(b.levelImages) && b.levelImages.length > 0) bld.maxLvl = b.levelImages.length;
+    if (b.wages != null && +b.wages > 0) bld.w = +b.wages;
+  }
+}
+
+async function loadBuildingConstants(force = false) {
+  if (!force) {
+    const cached = cGet('bldConst', ENCYC_TTL);
+    if (cached) { applyBuildingConstants(cached); return; }
+  }
+  try {
+    const res = await fetch(`${PROXY_URL}/api/v2/constants/buildings/`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) {
+      cSet('bldConst', data);
+      applyBuildingConstants(data);
+    }
+  } catch (e) {
+    console.warn('Building constants load failed:', e.message);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ENCYCLOPEDIA LOAD  (production rates from live API, cached 6h)
+───────────────────────────────────────────────────────────────────────────── */
+function applyEncyclopedia(data) {
+  for (const [k, v] of Object.entries(data)) {
+    if (!v) continue;
+    PROD[+k] = { n: v.n, pph: v.pph, i: v.i };
+  }
+}
+
+async function loadEncyclopedia(force = false) {
+  if (!force) {
+    const cached = cGet('encyclopedia', ENCYC_TTL);
+    if (cached) { applyEncyclopedia(cached); return; }
+  }
+  status('Syncing production data…', true);
+  const kinds = Array.from({ length: 200 }, (_, i) => i + 1);
+  const results = await Promise.allSettled(
+    kinds.map(k =>
+      fetch(`${PROXY_URL}/api/v4/en/0/encyclopedia/resources/0/${k}/`)
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null)
+    )
+  );
+  const data = {};
+  for (let i = 0; i < kinds.length; i++) {
+    const r = results[i].status === 'fulfilled' ? results[i].value : null;
+    if (!r || !r.producedAnHour) continue;
+    data[kinds[i]] = {
+      n:   r.name,
+      pph: r.producedAnHour,
+      i:   (r.producedFrom || []).map(inp => ({
+        k: inp.resource.db_letter,
+        a: inp.amount,
+      })),
+    };
+  }
+  if (Object.keys(data).length > 0) {
+    cSet('encyclopedia', data);
+    applyEncyclopedia(data);
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1027,16 +1120,13 @@ function iconHtml(kind) {
 /* ─────────────────────────────────────────────────────────────────────────────
    BOOT
 ───────────────────────────────────────────────────────────────────────────── */
-populateBldTypeDropdown();
-
-document.getElementById('aoInput').value = getAO();
-
-renderBuildingList();
-
-if (!playerBuildings.length) {
-  status('No buildings configured — add your buildings in the panel above.', false);
-} else {
-  status('Loading live prices…', true);
-}
-
-loadTicker();
+(async () => {
+  populateBldTypeDropdown();
+  document.getElementById('aoInput').value  = getAO();
+  document.getElementById('psbInput').value = getPSB();
+  document.getElementById('ssbInput').value = getSSB();
+  renderBuildingList();
+  status('Initializing…', true);
+  await Promise.all([loadEncyclopedia(), loadBuildingConstants()]);
+  loadTicker();
+})();
