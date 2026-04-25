@@ -107,6 +107,14 @@ tbody tr:hover{background:rgba(255,255,255,.018)}
 .ao-warn{font-size:11px;color:var(--amber);margin-top:5px}
 .detail-note{font-size:11px;color:var(--muted);margin-top:8px}
 
+/* ── Profit breakdown ───────────────────────────────────────────────── */
+.profit-breakdown{display:grid;grid-template-columns:1fr auto auto;gap:6px 20px;font-size:12px;align-items:center}
+.pb-row{display:contents}
+.pb-label{display:flex;align-items:center;gap:5px;line-height:1.4}
+.pb-price{text-align:right;color:var(--muted);white-space:nowrap}
+.pb-amount{text-align:right;font-weight:600;white-space:nowrap}
+.pb-divider{grid-column:1/-1;height:1px;background:var(--border);margin:2px 0}
+
 /* ── Recommendation chip ────────────────────────────────────────────── */
 .chip{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
 .chip-buy{background:var(--green-bg);color:var(--green)}

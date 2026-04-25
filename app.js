@@ -411,12 +411,24 @@ document.getElementById('ssbInput').addEventListener('input', e => {
 
 document.getElementById('bldTbody').addEventListener('click', e => {
   const btn = e.target.closest('[data-remove]');
-  if (!btn) return;
-  const idx = parseInt(btn.dataset.remove);
-  playerBuildings.splice(idx, 1);
-  savePlayerBuildings(playerBuildings);
-  renderBuildingList();
-  recalculate();
+  if (btn) {
+    const idx = parseInt(btn.dataset.remove);
+    playerBuildings.splice(idx, 1);
+    savePlayerBuildings(playerBuildings);
+    renderBuildingList();
+    recalculate();
+    return;
+  }
+  const tog = e.target.closest('.tog[data-bld-tog]');
+  if (tog) {
+    const idx = parseInt(tog.dataset.bldTog);
+    const det = document.getElementById('bdet' + idx);
+    if (!det) return;
+    const en = playerBuildings[idx];
+    if (en) det.querySelector('td').innerHTML = buildProfitDetail(en.bk, en.pk, en.lvl || 1, en.qty);
+    det.classList.toggle('hide');
+    tog.classList.toggle('open', !det.classList.contains('hide'));
+  }
 });
 
 document.getElementById('bldTbody').addEventListener('change', e => {
@@ -427,6 +439,7 @@ document.getElementById('bldTbody').addEventListener('change', e => {
     if (val < 1) { qtyInp.value = 1; return; }
     playerBuildings[idx].qty = val;
     savePlayerBuildings(playerBuildings);
+    renderBuildingList();
     recalculate();
     return;
   }
@@ -436,9 +449,9 @@ document.getElementById('bldTbody').addEventListener('change', e => {
     const bld = BLDS.find(b => b.k === playerBuildings[idx].bk);
     const max = bld ? bld.maxLvl : 1;
     const val = Math.min(max, Math.max(1, parseInt(lvlInp.value) || 1));
-    lvlInp.value = val;
     playerBuildings[idx].lvl = val;
     savePlayerBuildings(playerBuildings);
+    renderBuildingList();
     recalculate();
     return;
   }
@@ -448,6 +461,7 @@ document.getElementById('bldTbody').addEventListener('change', e => {
     const val = Math.max(0, parseFloat(rateInp.value) || 0);
     playerBuildings[idx].targetRate = val;
     savePlayerBuildings(playerBuildings);
+    renderBuildingList();
     recalculate();
   }
 });
@@ -458,7 +472,7 @@ function renderBuildingList() {
   count.textContent = playerBuildings.length;
 
   if (!playerBuildings.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);padding:14px 12px;font-size:12px">
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--muted);padding:14px 12px;font-size:12px">
       No buildings added yet. Use the form above to add your buildings.
     </td></tr>`;
     return;
@@ -471,10 +485,9 @@ function renderBuildingList() {
     const lvl      = e.lvl || 1;
     const maxLvl   = bld?.maxLvl || 1;
     const isRetail = bld?.c === 'retail';
+    const canDrill = !isRetail;
     let rateStr;
     if (isRetail) {
-      const ssb  = 1 + getSSB() / 100;
-      const rate = (e.targetRate != null ? e.targetRate : ((bld.rpph || 0) * lvl * 24)) * ssb;
       rateStr = `<input type="number" class="qty-inp" value="${Math.round(e.targetRate ?? (bld.rpph || 0) * lvl * 24)}" min="0"
                data-rate-idx="${i}" title="Units sold per day per building — edit to match your in-game rate"
                style="width:70px;background:var(--bg3);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
@@ -484,7 +497,17 @@ function renderBuildingList() {
       const ppd = prod ? prod.pph * lvl * e.qty * 24 * ao * psb : 0;
       rateStr = `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
     }
-    return `<tr>
+    const profitCell = (() => {
+      if (isRetail) return `<span style="color:var(--muted)">—</span>`;
+      const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty);
+      if (!p) return `<span style="color:var(--muted)">—</span>`;
+      const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
+      const mkt2 = buildMarketMap();
+      const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
+      return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}`;
+    })();
+    return `<tr class="bld-row">
+      <td>${canDrill ? `<span class="tog" id="btog${i}" data-bld-tog="${i}">&#9658;</span>` : ''}</td>
       <td><div class="res">${iconHtml(e.pk)}${esc(bld?.n || e.bk)}${isRetail ? ' <span class="chip chip-buy" style="font-size:9px;padding:1px 5px">RETAIL</span>' : ''}</div></td>
       <td style="color:var(--text)">${esc(prod?.n || '?')}</td>
       <td class="num">
@@ -496,17 +519,10 @@ function renderBuildingList() {
                data-qty-idx="${i}" style="width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
       </td>
       <td class="num" style="font-size:11px">${rateStr}</td>
-      <td class="num" style="font-size:11px">${(() => {
-        if (isRetail) return `<span style="color:var(--muted)">—</span>`;
-        const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty);
-        if (!p) return `<span style="color:var(--muted)">—</span>`;
-        const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
-        const mkt2 = buildMarketMap();
-        const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
-        return `<span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}`;
-      })()}</td>
+      <td class="num" style="font-size:11px">${profitCell}</td>
       <td style="text-align:right"><button class="sbtn" data-remove="${i}" title="Remove">&#10005;</button></td>
-    </tr>`;
+    </tr>
+    ${canDrill ? `<tr class="detail-tr hide" id="bdet${i}"><td colspan="8"></td></tr>` : ''}`;
   }).join('');
 }
 
@@ -747,6 +763,83 @@ function mvbDetail(r) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   PROFIT BREAKDOWN DETAIL
+───────────────────────────────────────────────────────────────────────────── */
+function buildProfitDetail(bk, pk, lvl, qty) {
+  const bld  = BLDS.find(b => b.k === bk);
+  const prod = PROD[+pk];
+  if (!bld || !prod || !ticker.length)
+    return '<div class="detail-inner" style="color:var(--muted);font-size:12px">No data available.</div>';
+
+  const mkt     = buildMarketMap();
+  const ao      = aoMultiplier(getAO());
+  const psb     = 1 + getPSB() / 100;
+  const l       = lvl || 1;
+  const q       = qty || 1;
+  const pphEff  = prod.pph * l * ao * psb;
+  const unitDay = pphEff * 24 * q;
+  const price   = mkt[+pk] || 0;
+  const revDay  = unitDay * price;
+  const wagDay  = bld.w * l * 24 * q;
+
+  const inputs = prod.i.map(inp => ({
+    k:    +inp.k,
+    n:    PROD[+inp.k]?.n || `Resource #${inp.k}`,
+    a:    inp.a,
+    p:    mkt[+inp.k] || 0,
+    cDay: inp.a * pphEff * 24 * q * (mkt[+inp.k] || 0),
+    zero: !mkt[+inp.k],
+  }));
+  const matDay  = inputs.reduce((s, i) => s + i.cDay, 0);
+  const profDay = revDay - matDay - wagDay;
+  const pc      = profDay >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const rateNote = [
+    fmtN(prod.pph * ao * psb) + '/hr',
+    l > 1 ? `Lvl ${l}` : null,
+    q > 1 ? `${q} bldgs` : null,
+  ].filter(Boolean).join(' × ') + ` = ${fmtN(unitDay)}/day`;
+
+  const inputRows = inputs.map(inp => `
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">
+        ${iconHtml(inp.k)}${esc(inp.n)}
+        <span style="opacity:.5;font-size:10px">(${fmtN(inp.a)}× per unit)</span>
+        ${inp.zero ? `<span style="color:var(--amber)" title="No market price — treated as $0">⚠</span>` : ''}
+      </div>
+      <div class="pb-price">${inp.zero ? '<span style="color:var(--amber)">no price</span>' : fmtSC(inp.p) + '/unit'}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(inp.cDay)}/day</div>
+    </div>`).join('');
+
+  return `<div class="detail-inner">
+    <div class="profit-breakdown">
+      <div class="pb-row">
+        <div class="pb-label">
+          ${iconHtml(+pk)}<strong>${esc(prod.n)}</strong>
+          <span style="color:var(--muted);font-weight:400;font-size:10px">${rateNote}</span>
+        </div>
+        <div class="pb-price">${price ? fmtSC(price) + '/unit' : '<span style="color:var(--amber)">no price</span>'}</div>
+        <div class="pb-amount" style="color:var(--green)">+${fmtSC(revDay)}/day</div>
+      </div>
+      ${inputRows}
+      <div class="pb-row">
+        <div class="pb-label" style="color:var(--muted)">
+          Wages (${esc(bld.n)}${l > 1 ? ' Lvl ' + l : ''}${q > 1 ? ' ×' + q : ''})
+        </div>
+        <div class="pb-price">${fmtSC(bld.w * l)}/hr</div>
+        <div class="pb-amount" style="color:var(--red)">−${fmtSC(wagDay)}/day</div>
+      </div>
+      <div class="pb-divider"></div>
+      <div class="pb-row">
+        <div class="pb-label" style="font-size:13px;font-weight:700">Profit / day</div>
+        <div></div>
+        <div class="pb-amount" style="font-size:14px;color:${pc}">${profDay >= 0 ? '+' : ''}${fmtSC(profDay)}/day</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    RENDER — BUILDING PROFITABILITY
 ───────────────────────────────────────────────────────────────────────────── */
 function renderOpportunities() {
@@ -777,16 +870,22 @@ function renderOpportunities() {
   rows.sort((a, b) => b.profDay - a.profDay);
 
   card.style.display = 'block';
-  document.getElementById('oppTbody').innerHTML = rows.map(r => {
-    const pc  = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
-    const bg  = r.owned ? 'background:rgba(34,197,94,.05);' : '';
-    return `<tr style="${bg}">
+  document.getElementById('oppTbody').innerHTML = rows.map((r, i) => {
+    const pc   = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
+    const bg   = r.owned ? 'background:rgba(34,197,94,.05);' : '';
+    const warn = r.missingInputs
+      ? ' <span style="color:var(--amber)" title="One or more input prices are $0 — profit may be overstated">⚠</span>'
+      : '';
+    return `
+    <tr class="opp-row" data-idx="${i}" data-bk="${r.bk}" data-pk="${r.pk}" style="cursor:pointer;${bg}">
+      <td><span class="tog" id="otog${i}">&#9658;</span></td>
       <td>${esc(r.bldName)}${r.owned ? ' <span class="badge" style="color:var(--green);border-color:var(--green)">owned</span>' : ''}</td>
       <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.revDay)}/day</td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.matDay + r.wagDay)}/day</td>
-      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day${r.missingInputs ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : ''}</td>
-    </tr>`;
+      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day${warn}</td>
+    </tr>
+    <tr class="detail-tr hide" id="odet${i}"><td colspan="6"></td></tr>`;
   }).join('');
 }
 
@@ -799,6 +898,20 @@ document.getElementById('defTbody').addEventListener('click', e => {
   const i   = row.dataset.idx;
   const det = document.getElementById('det' + i);
   const tog = document.getElementById('tog' + i);
+  det.classList.toggle('hide');
+  tog.classList.toggle('open', !det.classList.contains('hide'));
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   EVENT DELEGATION — opp rows
+───────────────────────────────────────────────────────────────────────────── */
+document.getElementById('oppTbody').addEventListener('click', e => {
+  const row = e.target.closest('.opp-row');
+  if (!row) return;
+  const i   = row.dataset.idx;
+  const det = document.getElementById('odet' + i);
+  const tog = document.getElementById('otog' + i);
+  det.querySelector('td').innerHTML = buildProfitDetail(row.dataset.bk, parseInt(row.dataset.pk), 1, 1);
   det.classList.toggle('hide');
   tog.classList.toggle('open', !det.classList.contains('hide'));
 });
@@ -834,6 +947,14 @@ function updateSummary() {
   const net      = totalMV - totalDef;
   const netColor = net >= 0 ? 'var(--green)' : 'var(--red)';
 
+  const totalProfit = playerBuildings.reduce((sum, e) => {
+    const bld = BLDS.find(b => b.k === e.bk);
+    if (!bld || bld.c !== 'production') return sum;
+    const p = calcBuildingProfit(e.bk, e.pk, e.lvl || 1, e.qty);
+    return p ? sum + p.profitDay : sum;
+  }, 0);
+  const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
+
   strip.className = 'sum-strip';
   strip.style.display = '';
   strip.innerHTML = `
@@ -852,6 +973,10 @@ function updateSummary() {
     <div class="sum-tile" style="border-color:${netColor}">
       <div class="sum-lbl">Net / Day</div>
       <div class="sum-val" style="color:${netColor}">${net >= 0 ? '+' : ''}${fmtSC(net)}</div>
+    </div>
+    <div class="sum-tile" style="border-color:${profitColor}">
+      <div class="sum-lbl">Profit / Day</div>
+      <div class="sum-val" style="color:${profitColor}">${totalProfit >= 0 ? '+' : ''}${fmtSC(totalProfit)}</div>
     </div>`;
 
   document.getElementById('spin').style.display = 'none';
@@ -910,7 +1035,9 @@ async function loadEncyclopedia(force = false) {
     if (cached) { applyEncyclopedia(cached); return; }
   }
   status('Syncing production data…', true);
-  const kinds = Array.from({ length: 200 }, (_, i) => i + 1);
+  // 36–39 are confirmed non-existent; stop at 155 where 404s become continuous
+  const SKIP = new Set([36, 37, 38, 39]);
+  const kinds = Array.from({ length: 155 }, (_, i) => i + 1).filter(k => !SKIP.has(k));
   const results = await Promise.allSettled(
     kinds.map(k =>
       fetch(`${PROXY_URL}/api/v4/en/0/encyclopedia/resources/0/${k}/`)
