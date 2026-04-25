@@ -1043,17 +1043,17 @@ function updateSummary() {
   }, 0);
   const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
 
-  // Best upgrade: building where +1 level gives the most additional profit/day
+  // Best upgrade: per-single-building gain from +1 level (use qty=1 to avoid inflating by building count)
   const best = playerBuildings
     .map(e => {
       const bld2 = BLDS.find(b => b.k === e.bk);
       if (!bld2 || bld2.c !== 'production') return null;
       const lv = e.lvl || 1;
       if (lv >= bld2.maxLvl) return null;
-      const curr = calcBuildingProfit(e.bk, e.pk, lv, e.qty);
-      const next = calcBuildingProfit(e.bk, e.pk, lv + 1, e.qty);
+      const curr = calcBuildingProfit(e.bk, e.pk, lv, 1);
+      const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1);
       if (!curr || !next) return null;
-      return { gain: next.profitDay - curr.profitDay, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv };
+      return { gain: next.profitDay - curr.profitDay, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv, qty: e.qty };
     })
     .filter(Boolean)
     .sort((a, b) => b.gain - a.gain)[0] || null;
@@ -1066,6 +1066,7 @@ function updateSummary() {
       <div style="font-size:13px;font-weight:700;margin-top:4px;color:${best.gain >= 0 ? 'var(--green)' : 'var(--red)'}">
         Lvl ${best.lv}&#x2192;${best.lv + 1}: ${best.gain >= 0 ? '+' : ''}${fmtSC(best.gain)}/day
       </div>
+      ${best.qty > 1 ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">per building &times; ${best.qty} = ${best.gain >= 0 ? '+' : ''}${fmtSC(best.gain * best.qty)}/day total</div>` : ''}
     </div>` : '';
 
   strip.className = 'sum-strip';
@@ -1084,11 +1085,11 @@ function updateSummary() {
       <div class="sum-val" style="color:${defRows.length ? 'var(--amber)' : 'var(--muted)'}">${defRows.length}</div>
     </div>
     <div class="sum-tile" style="border-color:${netColor}">
-      <div class="sum-lbl">Net / Day</div>
+      <div class="sum-lbl">Gross / Day</div>
       <div class="sum-val" style="color:${netColor}">${net >= 0 ? '+' : ''}${fmtSC(net)}</div>
     </div>
     <div class="sum-tile" style="border-color:${profitColor}">
-      <div class="sum-lbl">Profit / Day</div>
+      <div class="sum-lbl">Net Profit / Day</div>
       <div class="sum-val" style="color:${profitColor}">${totalProfit >= 0 ? '+' : ''}${fmtSC(totalProfit)}</div>
     </div>
     ${bestTile}`;
