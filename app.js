@@ -163,9 +163,9 @@ const BLDS = [
   {k:'W', n:'Water Reservoir',               w:345,   c:'production', maxLvl:15, o:[2]},
   {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:15, o:[3,4,5,6,40,66,72,106,118,120,136]},
   {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:6,  o:[9,46,115,116,117]},
-  {k:'M', n:'Mine',                          w:276,   c:'production', maxLvl:15, o:[14,15,68,42]},
-  {k:'O', n:'Oil Rig',                       w:517.5, c:'production', maxLvl:15, o:[10,74]},
-  {k:'Q', n:'Quarry',                        w:276,   c:'production', maxLvl:15, o:[44,104,105]},
+  {k:'M', n:'Mine',                          w:276,   c:'production', maxLvl:15, o:[14,15,68,42],    hasAbundance:true},
+  {k:'O', n:'Oil Rig',                       w:517.5, c:'production', maxLvl:15, o:[10,74],           hasAbundance:true},
+  {k:'Q', n:'Quarry',                        w:276,   c:'production', maxLvl:15, o:[44,104,105],      hasAbundance:true},
   {k:'S', n:'Shipping Depot',                w:310.5, c:'production', maxLvl:6,  o:[13]},
   {k:'Y', n:'Factory',                       w:414,   c:'production', maxLvl:15, o:[16,17,18,69,43,45,76,67]},
   {k:'R', n:'Refinery',                      w:483,   c:'production', maxLvl:6,  o:[11,12,19,75,83]},
@@ -270,6 +270,15 @@ function savePlayerBuildings(arr) {
 }
 
 let playerBuildings = loadPlayerBuildings();
+
+// Returns the effective abundance multiplier for a player building entry.
+// Mine, Oil Rig and Quarry are the only buildings where this is < 1.
+// Expected (mean) value is 0.6; valid range 0.10–1.00.
+function getAbundance(entry) {
+  const bld = BLDS.find(b => b.k === entry.bk);
+  if (!bld?.hasAbundance) return 1.0;
+  return entry.abundance ?? 0.6;
+}
 
 function getAO()  { return parseFloat(localStorage.getItem('sc_ao')  || '0') || 0; }
 function setAO(v)  { localStorage.setItem('sc_ao',  String(v)); }
@@ -380,6 +389,7 @@ document.getElementById('addBldBtn').addEventListener('click', () => {
     const bldDef = BLDS.find(b => b.k === bk);
     const entry = { bk, pk, qty, lvl };
     if (bldDef?.c === 'retail') entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
+    if (bldDef?.hasAbundance)   entry.abundance  = 0.6;  // default 60% (statistical mean)
     playerBuildings.push(entry);
   }
   savePlayerBuildings(playerBuildings);
@@ -429,7 +439,7 @@ document.getElementById('bldTbody').addEventListener('click', e => {
     const det = document.getElementById('bdet' + idx);
     if (!det) return;
     const en = playerBuildings[idx];
-    if (en) det.querySelector('td').innerHTML = buildProfitDetail(en.bk, en.pk, en.lvl || 1, en.qty);
+    if (en) det.querySelector('td').innerHTML = buildProfitDetail(en.bk, en.pk, en.lvl || 1, en.qty, getAbundance(en));
     det.classList.toggle('hide');
     tog.classList.toggle('open', !det.classList.contains('hide'));
   }
@@ -467,6 +477,17 @@ document.getElementById('bldTbody').addEventListener('change', e => {
     savePlayerBuildings(playerBuildings);
     renderBuildingList();
     recalculate();
+    return;
+  }
+  const abundInp = e.target.closest('[data-abund-idx]');
+  if (abundInp) {
+    const idx = parseInt(abundInp.dataset.abundIdx);
+    const pct = Math.min(100, Math.max(10, parseFloat(abundInp.value) || 60));
+    abundInp.value = pct;                                 // clamp displayed value
+    playerBuildings[idx].abundance = pct / 100;
+    savePlayerBuildings(playerBuildings);
+    renderBuildingList();
+    recalculate();
   }
 });
 
@@ -487,8 +508,9 @@ function renderBuildingList() {
     const prod     = PROD[e.pk];
     const lvl      = e.lvl || 1;
     const maxLvl   = bld?.maxLvl || 1;
-    const isRetail = bld?.c === 'retail';
-    const canDrill = !isRetail;
+    const isRetail  = bld?.c === 'retail';
+    const canDrill  = !isRetail;
+    const abundance = getAbundance(e);
     let rateStr;
     if (isRetail) {
       rateStr = `<input type="number" class="qty-inp" value="${Math.round(e.targetRate ?? (bld.rpph || 0) * lvl * 24)}" min="0"
@@ -497,23 +519,38 @@ function renderBuildingList() {
                <span style="font-size:10px;color:var(--muted)">/day</span>`;
     } else {
       const psb = 1 + getPSB() / 100;
-      const ppd = prod ? prod.pph * lvl * e.qty * 24 * psb : 0;
-      rateStr = `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
+      const ppd = prod ? prod.pph * lvl * e.qty * 24 * psb * abundance : 0;
+      const abundInput = bld?.hasAbundance
+        ? `<div style="margin-bottom:3px;display:flex;align-items:center;gap:3px">
+             <input type="number" class="qty-inp" value="${Math.round(abundance * 100)}" min="10" max="100"
+                    data-abund-idx="${i}" title="Resource abundance % (10–100). Default 60% is the expected average."
+                    style="width:40px;border-color:var(--amber);color:var(--amber)">
+             <span style="font-size:10px;color:var(--amber)">% abund.</span>
+           </div>` : '';
+      rateStr = abundInput + `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
     }
     const profitCell = (() => {
       if (isRetail) return `<span style="color:var(--muted)">—</span>`;
-      const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty);
+      const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty, abundance);
       if (!p) return `<span style="color:var(--muted)">—</span>`;
       const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
       const mkt2 = buildMarketMap();
       const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
       let upgradeHint = '';
       if (bld && lvl < (bld.maxLvl || 1)) {
-        const nxt = calcBuildingProfit(e.bk, e.pk, lvl + 1, e.qty);
-        if (nxt) {
-          const gain = nxt.profitDay - p.profitDay;
-          const gc = gain >= 0 ? 'var(--green)' : 'var(--red)';
-          upgradeHint = `<div style="font-size:10px;color:${gc};margin-top:2px;white-space:nowrap">&#x2191; Lvl ${lvl+1}: ${gain >= 0 ? '+' : ''}${fmtSC(gain)}/day</div>`;
+        // Use qty=1 so gain is per-building, not inflated by building count
+        const curr1 = calcBuildingProfit(e.bk, e.pk, lvl,     1, abundance);
+        const nxt1  = calcBuildingProfit(e.bk, e.pk, lvl + 1, 1, abundance);
+        if (curr1 && nxt1) {
+          const gain    = nxt1.profitDay - curr1.profitDay;
+          const upgCU   = bld.costUnits != null ? bld.costUnits * lvl : null;
+          const cuP     = mkt2[111] || 0;
+          const upgCost = upgCU != null && cuP > 0 ? upgCU * cuP : null;
+          const payback = upgCost != null && gain > 0 ? Math.ceil(upgCost / gain) : null;
+          const gc      = gain >= 0 ? 'var(--green)' : 'var(--red)';
+          const totalNote = e.qty > 1 ? ` (×${e.qty} = ${gain>=0?'+':''}${fmtSC(gain*e.qty)}/day)` : '';
+          const payNote   = payback != null ? ` · ${payback}d payback` : '';
+          upgradeHint = `<div style="font-size:10px;color:${gc};margin-top:2px;white-space:nowrap">&#x2191; Lvl ${lvl+1}: ${gain >= 0 ? '+' : ''}${fmtSC(gain)}/day each${totalNote}${payNote}</div>`;
         }
       }
       return `<div><span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}</div>${upgradeHint}`;
@@ -547,7 +584,7 @@ function buildMarketMap() {
   return m;
 }
 
-function calcBuildingProfit(bk, pk, lvl, qty) {
+function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
   const bld  = BLDS.find(b => b.k === bk);
   const prod = PROD[+pk];
   if (!bld || !prod || !ticker.length) return null;
@@ -555,12 +592,13 @@ function calcBuildingProfit(bk, pk, lvl, qty) {
   const psb    = 1 + getPSB() / 100;
   const l      = lvl || 1;
   const q      = qty || 1;
-  const pphEff = prod.pph * l * psb;                            // AO does NOT reduce output
+  const ab     = bld.hasAbundance ? abundance : 1.0;
+  const pphEff = prod.pph * l * psb * ab;                       // abundance scales production rate
   const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
   const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;
   const matDay = pphEff * 24 * matCPU * q;
-  const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);     // AO adds to wage cost
-  return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay };
+  const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);     // wages are fixed regardless of abundance
+  return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay, pphEff, ab };
 }
 
 function recalculate() {
@@ -592,7 +630,8 @@ function calculate() {
       consumed[+entry.pk] = (consumed[+entry.pk] || 0) + demand;
     } else {
       const psb      = 1 + getPSB() / 100;
-      const unitsDay = prod.pph * lvl * entry.qty * 24 * psb;
+      const ab       = getAbundance(entry);
+      const unitsDay = prod.pph * lvl * entry.qty * 24 * psb * ab;
       produced[+entry.pk] = (produced[+entry.pk] || 0) + unitsDay;
       for (const inp of prod.i) {
         consumed[+inp.k] = (consumed[+inp.k] || 0) + inp.a * unitsDay;
@@ -639,7 +678,8 @@ function calcMVB(kindId, deficitPerDay, marketMap) {
   const prod = PROD[+kindId];
   if (!prod) return null;
 
-  const effPph   = prod.pph;
+  const ab       = bld.hasAbundance ? 0.6 : 1.0;   // use expected abundance for MvB recommendation
+  const effPph   = prod.pph * ab;
   const wageCPU  = effPph > 0 ? bld.w * (1 + getAO() / 100) / effPph : 0;
   let   matCPU   = 0;
   for (const inp of prod.i) {
@@ -783,7 +823,7 @@ function mvbDetail(r) {
 /* ─────────────────────────────────────────────────────────────────────────────
    PROFIT BREAKDOWN DETAIL
 ───────────────────────────────────────────────────────────────────────────── */
-function buildProfitDetail(bk, pk, lvl, qty) {
+function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
   const bld  = BLDS.find(b => b.k === bk);
   const prod = PROD[+pk];
   if (!bld || !prod || !ticker.length)
@@ -794,13 +834,14 @@ function buildProfitDetail(bk, pk, lvl, qty) {
   const ao          = getAO();
   const l           = lvl || 1;
   const q           = qty || 1;
-  const pphEff      = prod.pph * l * psb;            // AO does NOT reduce output
+  const ab          = bld.hasAbundance ? abundance : 1.0;
+  const pphEff      = prod.pph * l * psb * ab;       // abundance scales production rate
   const unitDay     = pphEff * 24 * q;
   const price       = mkt[+pk] || 0;
   const revDay      = unitDay * price;
 
-  // Wage cost per unit = bld.w × (1 + AO%) / (pph × PSB)
-  const wagCPUBase  = prod.pph > 0 ? bld.w / (prod.pph * psb) : 0;
+  // Wage cost per unit = bld.w × (1 + AO%) / (pph × PSB × abundance)
+  const wagCPUBase  = pphEff > 0 ? bld.w / (pphEff / l) : 0;  // pphEff/l = per-unit effective rate
   const aoCPU       = wagCPUBase * ao / 100;
   const wagCPUTotal = wagCPUBase + aoCPU;
   const wagBaseDay  = bld.w * l * 24 * q;
@@ -823,12 +864,14 @@ function buildProfitDetail(bk, pk, lvl, qty) {
   const margin  = revDay > 0 ? profDay / revDay * 100 : 0;
   const pc      = profDay >= 0 ? 'var(--green)' : 'var(--red)';
 
-  const basePph  = prod.pph * psb;
-  const lvlPph   = basePph * l;
-  const perBldDay = fmtN(basePph * l * 24);
-  const rateNote = l > 1
-    ? `${fmtN(basePph)}/hr × Lvl ${l} = ${fmtN(lvlPph)}/hr = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`
-    : `${fmtN(basePph)}/hr = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`;
+  const basePph   = prod.pph * psb;
+  const afterAbund = basePph * ab;
+  const lvlPph    = afterAbund * l;
+  const perBldDay = fmtN(lvlPph * 24);
+  const abundStr  = ab < 1 ? ` × ${Math.round(ab * 100)}% abund.` : '';
+  const rateNote  = l > 1
+    ? `${fmtN(basePph)}/hr${abundStr} × Lvl ${l} = ${fmtN(lvlPph)}/hr = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`
+    : `${fmtN(basePph)}/hr${abundStr} = ${perBldDay}/day${q > 1 ? ` × ${q} bldgs = ${fmtN(unitDay)}/day` : ''}`;
 
   const hdr = `
     <div class="pb-row" style="border-bottom:1px solid var(--border);margin-bottom:4px;padding-bottom:4px">
@@ -918,7 +961,8 @@ function renderOpportunities() {
     for (const pk of bld.o) {
       const prod = PROD[pk];
       if (!prod) continue;
-      const pphEff  = prod.pph * lvl * psb;
+      const ab      = bld.hasAbundance ? 0.6 : 1.0;
+      const pphEff  = prod.pph * lvl * psb * ab;
       const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
       const revDay  = pphEff * 24 * (mkt[+pk] || 0);
       const matDay  = pphEff * 24 * matCPU;
@@ -926,7 +970,7 @@ function renderOpportunities() {
       const profDay = revDay - matDay - wagDay;
       const owned         = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
       const missingInputs = prod.i.some(inp => !mkt[+inp.k]);
-      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned, missingInputs });
+      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, revDay, matDay, wagDay, profDay, owned, missingInputs, hasAbundance: bld.hasAbundance });
     }
   }
 
@@ -947,6 +991,9 @@ function renderOpportunities() {
     const warn = r.missingInputs
       ? ' <span style="color:var(--amber)" title="One or more input prices are $0 — profit may be overstated">⚠</span>'
       : '';
+    const abundNote = r.hasAbundance
+      ? ' <span style="color:var(--amber);font-size:10px" title="Calculated at 60% default abundance (statistical mean). Actual profit depends on your building\'s abundance.">60% abund.</span>'
+      : '';
     return `
     <tr class="opp-row" data-idx="${i}" data-bk="${r.bk}" data-pk="${r.pk}" style="cursor:pointer;${bg}">
       <td><span class="tog" id="otog${i}">&#9658;</span></td>
@@ -954,7 +1001,7 @@ function renderOpportunities() {
       <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.revDay)}/day</td>
       <td class="num" style="color:var(--muted)">${fmtSC(r.matDay + r.wagDay)}/day</td>
-      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day${warn}</td>
+      <td class="num" style="color:${pc};font-weight:600">${r.profDay >= 0 ? '+' : ''}${fmtSC(r.profDay)}/day${warn}${abundNote}</td>
     </tr>
     <tr class="detail-tr hide" id="odet${i}"><td colspan="6"></td></tr>`;
   }).join('');
@@ -982,7 +1029,9 @@ document.getElementById('oppTbody').addEventListener('click', e => {
   const i   = row.dataset.idx;
   const det = document.getElementById('odet' + i);
   const tog = document.getElementById('otog' + i);
-  det.querySelector('td').innerHTML = buildProfitDetail(row.dataset.bk, parseInt(row.dataset.pk), oppLevel, 1);
+  const oppBld = BLDS.find(b => b.k === row.dataset.bk);
+  const oppAb  = oppBld?.hasAbundance ? 0.6 : 1.0;
+  det.querySelector('td').innerHTML = buildProfitDetail(row.dataset.bk, parseInt(row.dataset.pk), oppLevel, 1, oppAb);
   det.classList.toggle('hide');
   tog.classList.toggle('open', !det.classList.contains('hide'));
 });
@@ -1038,36 +1087,61 @@ function updateSummary() {
   const totalProfit = playerBuildings.reduce((sum, e) => {
     const bld = BLDS.find(b => b.k === e.bk);
     if (!bld || bld.c !== 'production') return sum;
-    const p = calcBuildingProfit(e.bk, e.pk, e.lvl || 1, e.qty);
+    const p = calcBuildingProfit(e.bk, e.pk, e.lvl || 1, e.qty, getAbundance(e));
     return p ? sum + p.profitDay : sum;
   }, 0);
   const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
 
-  // Best upgrade: per-single-building gain from +1 level (use qty=1 to avoid inflating by building count)
+  // Best upgrade: sort by payback period (upgrade cost ÷ daily gain) so higher levels
+  // don't dominate just because they have the same absolute gain but cost far more.
+  // Upgrade cost: costUnits × N Construction Units for Lvl N → N+1
+  const cuPrice = buildMarketMap()[111] || 0;
   const best = playerBuildings
     .map(e => {
       const bld2 = BLDS.find(b => b.k === e.bk);
       if (!bld2 || bld2.c !== 'production') return null;
       const lv = e.lvl || 1;
       if (lv >= bld2.maxLvl) return null;
-      const curr = calcBuildingProfit(e.bk, e.pk, lv, 1);
-      const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1);
+      const ab   = getAbundance(e);
+      const curr = calcBuildingProfit(e.bk, e.pk, lv,     1, ab);
+      const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1, ab);
       if (!curr || !next) return null;
-      return { gain: next.profitDay - curr.profitDay, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv, qty: e.qty };
+      const gain = next.profitDay - curr.profitDay;
+      // costUnits × lv = CU needed; × cuPrice = monetary cost
+      const upgCU   = bld2.costUnits != null ? bld2.costUnits * lv : null;
+      const upgCost = upgCU != null && cuPrice > 0 ? upgCU * cuPrice : null;
+      const payback = upgCost != null && gain > 0 ? upgCost / gain : null;
+      return { gain, upgCU, upgCost, payback, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv, qty: e.qty };
     })
     .filter(Boolean)
-    .sort((a, b) => b.gain - a.gain)[0] || null;
+    .sort((a, b) => {
+      // Prefer shortest payback; fall back to highest gain if costs unknown
+      if (a.payback != null && b.payback != null) return a.payback - b.payback;
+      if (a.payback != null) return -1;
+      if (b.payback != null) return  1;
+      return b.gain - a.gain;
+    })[0] || null;
 
-  const bestTile = best ? `
+  const bestTile = best ? (() => {
+    const gc = best.gain >= 0 ? 'var(--green)' : 'var(--red)';
+    const paybackLine = best.payback != null
+      ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">
+           ~${Math.ceil(best.payback)} day payback &middot; ${fmtN(best.upgCU, 0)} CU (${fmtSC(best.upgCost)})
+         </div>` : '';
+    const totalLine = best.qty > 1
+      ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">per building &times; ${best.qty} = ${fmtSC(best.gain * best.qty)}/day total</div>` : '';
+    return `
     <div class="sum-tile" style="min-width:170px">
       <div class="sum-lbl" style="color:var(--amber)">Best Upgrade &#x2191;</div>
       <div style="font-size:14px;font-weight:700;color:var(--text);margin:3px 0 1px">${esc(best.bldName)}</div>
       <div style="font-size:11px;color:var(--muted)">${esc(best.prodName)}</div>
-      <div style="font-size:13px;font-weight:700;margin-top:4px;color:${best.gain >= 0 ? 'var(--green)' : 'var(--red)'}">
+      <div style="font-size:13px;font-weight:700;margin-top:4px;color:${gc}">
         Lvl ${best.lv}&#x2192;${best.lv + 1}: ${best.gain >= 0 ? '+' : ''}${fmtSC(best.gain)}/day
       </div>
-      ${best.qty > 1 ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">per building &times; ${best.qty} = ${best.gain >= 0 ? '+' : ''}${fmtSC(best.gain * best.qty)}/day total</div>` : ''}
-    </div>` : '';
+      ${totalLine}
+      ${paybackLine}
+    </div>`;
+  })() : '';
 
   strip.className = 'sum-strip';
   strip.style.display = '';
@@ -1107,12 +1181,18 @@ function updateSummary() {
 ───────────────────────────────────────────────────────────────────────────── */
 function applyBuildingConstants(data) {
   for (const b of data) {
-    const letter = b.db_letter != null ? String(b.db_letter) : null;
+    // API may return db_letter (snake_case) or dbLetter (camelCase)
+    const letter = b.db_letter != null ? String(b.db_letter)
+                 : b.dbLetter  != null ? String(b.dbLetter)
+                 : null;
     if (!letter) continue;
     const bld = BLDS.find(x => x.k === letter);
     if (!bld) continue;
     if (Array.isArray(b.levelImages) && b.levelImages.length > 0) bld.maxLvl = b.levelImages.length;
     if (b.wages != null && +b.wages > 0) bld.w = +b.wages;
+    // costUnits = number of Construction Units (kind 111) required per level upgrade
+    const cu = b.costUnits ?? b.cost_units ?? null;
+    if (cu != null && +cu > 0) bld.costUnits = +cu;
   }
 }
 
