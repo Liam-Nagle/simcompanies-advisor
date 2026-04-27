@@ -1333,22 +1333,12 @@ function hideSessionModal() {
 }
 
 document.getElementById('updateSessionBtn').addEventListener('click', () => {
-  // If cookie already stored, refresh all account data immediately without reopening the modal
-  if (getStoredCookie()) {
-    loadFinancials(true);
-    syncCompanyProfile();
-  } else {
-    showSessionModal();
-  }
+  document.getElementById('cookieInput').value = getStoredCookie();
+  showSessionModal();
 });
 document.getElementById('loadFinBtn').addEventListener('click', () => {
-  if (getStoredCookie()) {
-    loadFinancials(true);
-    syncCompanyProfile();
-  } else {
-    document.getElementById('cookieInput').value = '';
-    showSessionModal();
-  }
+  document.getElementById('cookieInput').value = getStoredCookie();
+  showSessionModal();
 });
 document.getElementById('saveSessionBtn').addEventListener('click', async () => {
   const val = document.getElementById('cookieInput').value.trim();
@@ -1475,10 +1465,26 @@ async function syncCompanyProfile() {
 
     if (!company) { console.warn('[syncCompanyProfile] no company data returned'); return; }
 
-    // Store company ID — needed for warehouse endpoint
-    if (company.id) {
-      companyId = company.id;
-      loadWarehouse(companyId); // fire-and-forget; it re-renders when ready
+    // Log all keys so we can see the exact field names if something is missing
+    console.log('[profile sync] company keys:', Object.keys(company));
+
+    // Store company ID — needed for the warehouse endpoint.
+    // Try every known variant; the API docs say "id" but camelCase variants exist too.
+    const cId = company.id ?? company.companyId ?? company.company_id ?? company.db_id ?? null;
+    console.log('[profile sync] resolved company id:', cId);
+    if (cId) {
+      companyId = +cId;
+      loadWarehouse(companyId); // fire-and-forget; re-renders when ready
+    } else {
+      // Last resort: hit the direct profile endpoint which is documented to return `id`
+      console.warn('[profile sync] no id in authCompany — trying /api/v2/companies/me/ for id');
+      apiFetch('/api/v2/companies/me/', 'me_profile', true)
+        .then(p => {
+          const fallbackId = p?.id ?? p?.companyId ?? null;
+          console.log('[profile sync] fallback id:', fallbackId);
+          if (fallbackId) { companyId = +fallbackId; loadWarehouse(companyId); }
+        })
+        .catch(err => console.warn('[profile sync] fallback /me/ failed:', err));
     }
 
     // Admin overhead (confirmed field: adminOverhead per API docs)
