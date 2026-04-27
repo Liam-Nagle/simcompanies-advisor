@@ -264,6 +264,11 @@ async function apiFetch(path, cacheKey, force = false) {
 let ticker    = [];
 let tickerAge = null;
 
+// Warehouse / inventory data — populated from /api/v3/resources/{company_id}/
+// kindId → total units in stock (aggregated across all quality/batch entries)
+let warehouseStock = {};
+let companyId = null;
+
 // Player buildings: array of {bk: buildingKind, pk: productKind, qty: number}
 function loadPlayerBuildings() {
   try {
@@ -614,6 +619,7 @@ function recalculate() {
   renderDeficit();
   updateSummary();
   renderOpportunities();
+  if (Object.keys(warehouseStock).length) updateWarehouseDisplay(document.getElementById('whSearch')?.value || '');
 }
 
 function calculate() {
@@ -740,6 +746,9 @@ function renderSurplus() {
   if (!surRows.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
+  const hasStock = Object.keys(warehouseStock).length > 0;
+  document.getElementById('surStockTh').style.display = hasStock ? '' : 'none';
+
   document.getElementById('surTbody').innerHTML = surRows.map(r => `
     <tr>
       <td><div class="res">${iconHtml(r.kind)}${esc(r.name)}</div></td>
@@ -747,6 +756,7 @@ function renderSurplus() {
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--green)">+${fmtN(r.net)}</td>
       <td class="num" style="color:var(--gold)">${fmtSC(r.mv)}</td>
+      ${hasStock ? stockCell(r.kind, r.net) : ''}
     </tr>`).join('');
 }
 
@@ -759,10 +769,16 @@ function renderDeficit() {
   if (!defRows.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
 
+  const hasStock = Object.keys(warehouseStock).length > 0;
+  document.getElementById('defStockTh').style.display = hasStock ? '' : 'none';
+  const defCols = hasStock ? 8 : 7;
+
   document.getElementById('defTbody').innerHTML = defRows.map((r, i) => {
     const chipHtml = r.mvb
       ? `<span class="chip chip-${r.rec}">${r.rec === 'buy' ? 'Buy' : 'Make'} &mdash; save ${fmtSC(r.mvb.saving)}/day</span>`
       : `<span style="color:var(--muted);font-size:11px">—</span>`;
+    // For deficit: show stock and how many days of cover remain
+    const stockHtml = hasStock ? stockCell(r.kind, Math.abs(r.net)) : '';
 
     return `
     <tr class="def-row" data-idx="${i}" style="cursor:pointer">
@@ -771,11 +787,12 @@ function renderDeficit() {
       <td class="num">${r.produced > 0.001 ? fmtN(r.produced) : '—'}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--amber)">${fmtN(r.net)}</td>
+      ${stockHtml}
       <td class="num">${fmtSC(r.buyCost)}/day</td>
       <td>${chipHtml}</td>
     </tr>
     <tr class="detail-tr hide" id="det${i}">
-      <td colspan="7">${mvbDetail(r)}</td>
+      <td colspan="${defCols}">${mvbDetail(r)}</td>
     </tr>`;
   }).join('');
 }
@@ -1045,6 +1062,13 @@ document.getElementById('oppTbody').addEventListener('click', e => {
 /* ─────────────────────────────────────────────────────────────────────────────
    BUILDING PROFITABILITY CONTROLS
 ───────────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────────
+   WAREHOUSE SEARCH
+───────────────────────────────────────────────────────────────────────────── */
+document.getElementById('whSearch').addEventListener('input', e => {
+  updateWarehouseDisplay(e.target.value);
+});
+
 document.getElementById('oppLevel').addEventListener('input', e => {
   oppLevel = Math.max(1, parseInt(e.target.value) || 1);
   renderOpportunities();
@@ -1441,6 +1465,12 @@ async function syncCompanyProfile() {
 
     if (!company) { console.warn('[syncCompanyProfile] no company data returned'); return; }
 
+    // Store company ID — needed for warehouse endpoint
+    if (company.id) {
+      companyId = company.id;
+      loadWarehouse(companyId); // fire-and-forget; it re-renders when ready
+    }
+
     // Admin overhead (confirmed field: adminOverhead per API docs)
     const ao = company.adminOverhead ?? company.admin_overhead ?? null;
     if (ao != null && !isNaN(+ao) && +ao >= 0) {
@@ -1467,6 +1497,119 @@ async function syncCompanyProfile() {
   } catch (err) {
     console.warn('[syncCompanyProfile] failed:', err);
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   WAREHOUSE / INVENTORY
+───────────────────────────────────────────────────────────────────────────── */
+async function loadWarehouse(cId) {
+  if (!cId) return;
+  try {
+    const data = await apiFetch(`/api/v3/resources/${cId}/`, 'warehouse', true);
+    console.log('[loadWarehouse] raw response:', data);
+    if (!Array.isArray(data)) return;
+
+    // Aggregate total stock per resource kind across all batches/quality tiers
+    warehouseStock = {};
+    for (const item of data) {
+      const k = +(item.kind ?? item.resource_kind ?? item.resourceKind ?? 0);
+      if (!k) continue;
+      warehouseStock[k] = (warehouseStock[k] || 0) + +(item.amount ?? item.quantity ?? 0);
+    }
+
+    // Re-render tables and display to pick up stock columns
+    if (surRows.length) renderSurplus();
+    if (defRows.length) renderDeficit();
+    updateWarehouseDisplay();
+
+    // Show stock column headers now that we have data
+    const hasStock = Object.keys(warehouseStock).length > 0;
+    document.getElementById('surStockTh').style.display = hasStock ? '' : 'none';
+    document.getElementById('defStockTh').style.display = hasStock ? '' : 'none';
+
+  } catch (err) {
+    console.warn('[loadWarehouse] failed:', err);
+  }
+}
+
+function stockCell(kindId, netPerDay) {
+  const amt = warehouseStock[kindId];
+  if (!amt) return '<td class="num" style="color:var(--muted)">—</td>';
+  const days = netPerDay > 0 ? (amt / netPerDay) : null;
+  const daysStr = days != null ? ` <span style="color:var(--muted);font-size:10px">(${days.toFixed(1)}d)</span>` : '';
+  return `<td class="num">${fmtN(amt)}${daysStr}</td>`;
+}
+
+function updateWarehouseDisplay(filter = '') {
+  const card   = document.getElementById('whCard');
+  const tbody  = document.getElementById('whTbody');
+  const badge  = document.getElementById('whCount');
+  const valEl  = document.getElementById('whValue');
+  if (!card || !tbody) return;
+
+  const mkt = buildMarketMap();
+
+  // Build a net-flow lookup from surRows / defRows for days-of-cover
+  const flowMap = {}; // kind → net units/day (+surplus, -deficit)
+  for (const r of surRows) flowMap[r.kind] = +(flowMap[r.kind] || 0) + r.net;
+  for (const r of defRows) flowMap[r.kind] = +(flowMap[r.kind] || 0) + r.net; // net is negative for deficits
+
+  const lc = filter.toLowerCase();
+  const rows = Object.entries(warehouseStock)
+    .filter(([k, amt]) => amt > 0 && PROD[+k])
+    .map(([k, amt]) => {
+      const kind  = +k;
+      const price = mkt[kind] || 0;
+      const value = amt * price;
+      const name  = PROD[kind].n;
+      const flow  = flowMap[kind] ?? null;   // null = no buildings using this resource
+      const days  = flow != null && flow !== 0 ? amt / Math.abs(flow) : null;
+      return { kind, name, amt, price, value, flow, days };
+    })
+    .filter(r => !lc || r.name.toLowerCase().includes(lc))
+    .sort((a, b) => b.value - a.value);
+
+  const totalValue = rows.reduce((s, r) => s + r.value, 0);
+
+  badge.textContent = rows.length;
+  valEl.textContent = `Est. value ${fmtSC(totalValue)}`;
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:14px 12px;font-size:12px">${filter ? 'No matching resources.' : 'Warehouse is empty.'}</td></tr>`;
+    card.style.display = 'block';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    // Daily flow cell
+    let flowHtml = '<td class="num" style="color:var(--muted)">—</td>';
+    if (r.flow != null) {
+      const sign = r.flow >= 0 ? '+' : '';
+      const cls  = r.flow >= 0 ? 'var(--green)' : 'var(--amber)';
+      flowHtml = `<td class="num" style="color:${cls}">${sign}${fmtN(r.flow)}/day</td>`;
+    }
+
+    // Days-of-cover cell
+    let coverHtml = '<td class="num" style="color:var(--muted)">—</td>';
+    if (r.days != null) {
+      let cls = 'cover-pos';
+      if (r.flow < 0 && r.days < 1)  cls = 'cover-warn';   // less than 1 day — red
+      else if (r.flow < 0 && r.days < 3) cls = 'cover-neg'; // less than 3 days — amber
+      const label = r.flow >= 0 ? `${r.days.toFixed(1)}d buffer` : `${r.days.toFixed(1)}d left`;
+      coverHtml = `<td class="num ${cls}">${label}</td>`;
+    }
+
+    return `<tr>
+      <td><div class="res">${iconHtml(r.kind)}${esc(r.name)}</div></td>
+      <td class="num">${fmtN(r.amt)}</td>
+      <td class="num" style="color:var(--muted)">${r.price ? fmtSC(r.price) : '—'}</td>
+      <td class="num" style="color:var(--gold)">${r.value ? fmtSC(r.value) : '—'}</td>
+      ${flowHtml}
+      ${coverHtml}
+    </tr>`;
+  }).join('');
+
+  card.style.display = 'block';
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1499,44 +1642,44 @@ async function syncBuildingsFromGame() {
     if (!Array.isArray(data)) throw new Error('Unexpected response format (not an array)');
 
     const newBuildings = [];
-    let skipped = 0;
+    const skippedNames = []; // building names we couldn't resolve product for
 
     for (const b of data) {
       // API docs confirm: name (building type name), size (level).
-      // Product kind is NOT in the documented fields — try every known variant.
+      // Product kind is NOT a documented field — try every possible variant anyway.
       const lvl = +(b.size ?? b.level ?? 1);
       if (lvl < 1) continue;
 
-      // Resolve building kind: try direct kind fields first, fall back to name lookup
+      // Resolve building kind: try direct fields first, then name reverse-lookup
       let bk = String(b.kind ?? b.db_letter ?? b.dbLetter ?? '');
-      if (!bk || !BLDS.find(x => x.k === bk)) {
-        bk = bldKindFromName(b.name) ?? '';
+      if (!bk || !BLDS.find(x => x.k === bk)) bk = bldKindFromName(b.name) ?? '';
+      if (!bk) {
+        console.log('[sync] unrecognised building:', b);
+        skippedNames.push(b.name ?? '(unknown)');
+        continue;
       }
-      if (!bk) { console.log('[sync] cannot resolve building kind for:', b); skipped++; continue; }
 
       const bldDef = BLDS.find(x => x.k === bk);
-      if (!bldDef) { skipped++; continue; }
+      if (!bldDef) { skippedNames.push(b.name ?? bk); continue; }
 
-      // Resolve product kind: try documented and undocumented field variants
+      // Try every known/undocumented field for product kind
       let pk = +(
-        b.producing_kind   ?? b.producingKind   ??
-        b.production_kind  ?? b.productionKind  ??
-        b.producing        ?? b.product_kind    ??
-        b.productKind      ??
-        b.busy?.kind       ?? b.busy?.resource_kind ??
-        b.busy?.sales_order?.kind ??
+        b.producing_kind  ?? b.producingKind  ??
+        b.production_kind ?? b.productionKind ??
+        b.producing       ?? b.product_kind   ??
+        b.productKind     ??
+        b.busy?.kind      ?? b.busy?.resource_kind ??
+        b.busy?.sales_order?.kind ?? b.busy?.salesOrder?.kind ??
         0
       );
 
-      // If no product kind from API, use the only option if this building has exactly one
-      if (!pk && bldDef.o.length === 1) {
-        pk = bldDef.o[0];
-      }
+      // Single-product buildings: auto-fill (Power Plant, Water Reservoir, etc.)
+      if (!pk && bldDef.o.length === 1) pk = bldDef.o[0];
 
       if (!pk || !PROD[pk]) {
-        // Can't determine what this building produces — skip with explanation
-        console.log('[sync] no product kind for building:', b.name ?? bk, '— needs manual entry');
-        skipped++;
+        const label = `${b.name ?? bldDef.n} Lvl ${lvl}`;
+        console.log(`[sync] skipped "${label}" — API returned no product kind. Fields:`, Object.keys(b));
+        skippedNames.push(label);
         continue;
       }
 
@@ -1545,42 +1688,51 @@ async function syncBuildingsFromGame() {
         existing.qty++;
       } else {
         const entry = { bk, pk, qty: 1, lvl };
-        if (bldDef.c === 'retail')  entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
-        if (bldDef.hasAbundance)    entry.abundance  = 0.6;
+        if (bldDef.c === 'retail') entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
+        if (bldDef.hasAbundance)   entry.abundance  = 0.6;
         newBuildings.push(entry);
       }
     }
 
-    if (newBuildings.length === 0 && data.length > 0) {
-      // We got buildings but couldn't resolve any products — likely the API doesn't
-      // expose producing_kind. Show a helpful message with raw data hint.
-      alert(
-        `Got ${data.length} building(s) from the API but couldn't determine what each one produces.\n\n` +
-        `This usually means the API doesn't include the product kind in the buildings response.\n\n` +
-        `Check the browser console (F12 → Console) — look for "[syncBuildingsFromGame] raw response" ` +
-        `to see exactly what fields the API returns. Share that with the developer to add support.`
-      );
-      return;
-    }
-
-    if (newBuildings.length === 0) {
+    // Build a human-readable summary for the user
+    if (data.length === 0) {
       alert('No buildings found in your game account.');
       return;
     }
 
-    const skipNote = skipped > 0 ? `\n\n(${skipped} building(s) skipped — product unknown, add manually)` : '';
-    const msg = playerBuildings.length > 0
-      ? `Replace your ${playerBuildings.length} existing building(s) with ${newBuildings.length} imported from game?${skipNote}`
-      : `Import ${newBuildings.length} building(s) from game?${skipNote}`;
-    if (!confirm(msg)) return;
+    if (newBuildings.length === 0) {
+      // Got buildings but none had a resolvable product
+      const skipList = skippedNames.slice(0, 10).join('\n  • ');
+      alert(
+        `Found ${data.length} building(s) but couldn't determine what they produce.\n\n` +
+        `Buildings found:\n  • ${skipList}${skippedNames.length > 10 ? `\n  … and ${skippedNames.length - 10} more` : ''}\n\n` +
+        `These are likely multi-product buildings (Farm, Mine, Factory, etc.).\n` +
+        `The SimCompanies API doesn't return the chosen product for each building.\n\n` +
+        `Please add them manually using the form above — choose the building, then select which product it's set to make.\n\n` +
+        `(Tip: open F12 → Console and look for "[syncBuildingsFromGame] raw response" to see all API fields — ` +
+        `if you spot a product field not listed here, let the developer know.)`
+      );
+      return;
+    }
+
+    // Some could be imported, some couldn't
+    let confirmMsg = playerBuildings.length > 0
+      ? `Replace your ${playerBuildings.length} existing building(s) with ${newBuildings.length} imported from game?`
+      : `Import ${newBuildings.length} building(s) from game?`;
+
+    if (skippedNames.length > 0) {
+      const skipList = skippedNames.slice(0, 8).join(', ');
+      confirmMsg += `\n\n⚠ ${skippedNames.length} building(s) could not be auto-imported (multi-product — add manually):\n${skipList}${skippedNames.length > 8 ? ', …' : ''}`;
+    }
+    if (!confirm(confirmMsg)) return;
 
     playerBuildings = newBuildings;
     savePlayerBuildings(playerBuildings);
     renderBuildingList();
     recalculate();
 
-    const skipSuffix = skipped > 0 ? ` (${skipped} skipped — add manually)` : '';
-    status(`Imported ${newBuildings.length} buildings from game account.${skipSuffix}`, false);
+    const skipSuffix = skippedNames.length > 0 ? ` · ${skippedNames.length} skipped (multi-product — add manually)` : '';
+    status(`Imported ${newBuildings.length} building(s) from game.${skipSuffix}`, false);
 
   } catch (err) {
     if (err?.type === 'auth') {

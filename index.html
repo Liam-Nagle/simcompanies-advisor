@@ -126,6 +126,7 @@
             <th class="num" data-sort-tbl="s" data-sort-col="consumed">Consumed/Day</th>
             <th class="num" data-sort-tbl="s" data-sort-col="net">Net Balance/Day</th>
             <th class="num" data-sort-tbl="s" data-sort-col="mv">Market Value/Day</th>
+            <th class="num" id="surStockTh" style="display:none">In Stock</th>
           </tr>
         </thead>
         <tbody id="surTbody"></tbody>
@@ -155,11 +156,39 @@
             <th class="num" data-sort-tbl="d" data-sort-col="produced">Produced/Day</th>
             <th class="num" data-sort-tbl="d" data-sort-col="consumed">Consumed/Day</th>
             <th class="num" data-sort-tbl="d" data-sort-col="net">Net/Day</th>
+            <th class="num" id="defStockTh" style="display:none">In Stock</th>
             <th class="num" data-sort-tbl="d" data-sort-col="buyCost">Buy Cost/Day</th>
             <th data-sort-tbl="d" data-sort-col="rec">Recommendation</th>
           </tr>
         </thead>
         <tbody id="defTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Warehouse / Inventory ──────────────────────────────────────────── -->
+  <div class="card" id="whCard" style="display:none">
+    <div class="sec-head">
+      <span class="dot dot-b"></span>
+      <span class="sec-title">Warehouse</span>
+      <span class="badge" id="whCount">0</span>
+      <span class="card-sub" id="whValue"></span>
+      <input id="whSearch" type="search" placeholder="Filter…"
+             style="margin-left:auto;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 8px;font-size:11px;width:120px;outline:none;color-scheme:dark">
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Resource</th>
+            <th class="num">In Stock</th>
+            <th class="num">Market Price</th>
+            <th class="num">Est. Value</th>
+            <th class="num">Daily Flow</th>
+            <th class="num">Days Cover</th>
+          </tr>
+        </thead>
+        <tbody id="whTbody"></tbody>
       </table>
     </div>
   </div>

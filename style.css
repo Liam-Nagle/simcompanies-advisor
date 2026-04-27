@@ -61,10 +61,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .txn:last-child{border-bottom:none}
 .txn-amt{font-weight:600}
 
+/* ── Days-cover badge ────────────────────────────────────────────────── */
+.cover-pos{color:var(--green)} .cover-neg{color:var(--amber)} .cover-warn{color:var(--red)}
+
 /* ── Section header ─────────────────────────────────────────────────── */
 .sec-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-.dot-g{background:var(--green)} .dot-a{background:var(--amber)}
+.dot-g{background:var(--green)} .dot-a{background:var(--amber)} .dot-b{background:#60a5fa}
 .sec-title{font-size:14px;font-weight:600}
 .badge{background:var(--bg3);border-radius:20px;padding:1px 7px;font-size:11px;color:var(--muted);border:1px solid var(--border)}
 .sort-wrap{margin-left:auto;display:flex;gap:5px;align-items:center;font-size:11px;color:var(--muted);flex-wrap:wrap}
