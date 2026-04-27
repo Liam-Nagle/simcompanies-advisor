@@ -1333,12 +1333,22 @@ function hideSessionModal() {
 }
 
 document.getElementById('updateSessionBtn').addEventListener('click', () => {
-  document.getElementById('cookieInput').value = getStoredCookie();
-  showSessionModal();
+  // If cookie already stored, refresh all account data immediately without reopening the modal
+  if (getStoredCookie()) {
+    loadFinancials(true);
+    syncCompanyProfile();
+  } else {
+    showSessionModal();
+  }
 });
 document.getElementById('loadFinBtn').addEventListener('click', () => {
-  document.getElementById('cookieInput').value = getStoredCookie();
-  showSessionModal();
+  if (getStoredCookie()) {
+    loadFinancials(true);
+    syncCompanyProfile();
+  } else {
+    document.getElementById('cookieInput').value = '';
+    showSessionModal();
+  }
 });
 document.getElementById('saveSessionBtn').addEventListener('click', async () => {
   const val = document.getElementById('cookieInput').value.trim();
@@ -1803,4 +1813,10 @@ function iconHtml(kind) {
   status('Initializing…', true);
   await Promise.all([loadEncyclopedia(), loadBuildingConstants()]);
   loadTicker();
+  // If the user already has a stored cookie, auto-load account data on every page load
+  // (financials, company profile / AO sync, and warehouse inventory)
+  if (getStoredCookie()) {
+    loadFinancials();
+    syncCompanyProfile(); // also triggers loadWarehouse internally
+  }
 })();
