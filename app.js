@@ -245,8 +245,14 @@ async function apiFetch(path, cacheKey, force = false) {
   const cookie = getStoredCookie();
   if (cookie) headers['X-Sim-Cookie'] = cookie;
   const res = await fetch(PROXY_URL + path, { headers });
-  if (res.status === 401 || res.status === 403) throw { type: 'auth', status: res.status, path };
-  if (!res.ok) throw { type: 'http', status: res.status, path };
+  if (res.status === 401 || res.status === 403) {
+    console.warn(`[apiFetch] AUTH FAILED ${res.status} — ${path}`);
+    throw { type: 'auth', status: res.status, path };
+  }
+  if (!res.ok) {
+    console.warn(`[apiFetch] HTTP ${res.status} — ${path}`);
+    throw { type: 'http', status: res.status, path };
+  }
   const data = await res.json();
   cSet(cacheKey, data);
   return data;
@@ -1337,21 +1343,32 @@ async function loadFinancials(force = false) {
   content.style.display = 'block';
   content.innerHTML = '<div style="padding:14px 16px;color:var(--muted);font-size:13px">Loading financial data…</div>';
 
+  // Track whether any request came back as unauthorised
+  let authFailed = false;
+  const catchErr = (label) => (err) => {
+    console.warn(`[loadFinancials] ${label}:`, err);
+    if (err?.type === 'auth') authFailed = true;
+    return null;
+  };
+
   try {
     const [balance, income, cashflow] = await Promise.all([
-      apiFetch('/api/v2/companies/me/balance-sheet/',    'balance',  force).catch(() => null),
-      apiFetch('/api/v2/companies/me/income-statement/', 'income',   force).catch(() => null),
-      apiFetch('/api/v2/companies/me/cashflow/recent/',  'cashflow', force).catch(() => null),
+      apiFetch('/api/v2/companies/me/balance-sheet/',    'balance',  force).catch(catchErr('balance-sheet')),
+      apiFetch('/api/v2/companies/me/income-statement/', 'income',   force).catch(catchErr('income-statement')),
+      apiFetch('/api/v2/companies/me/cashflow/recent/',  'cashflow', force).catch(catchErr('cashflow')),
     ]);
-    renderFinancials(balance, income, cashflow);
-  } catch (err) {
-    if (err?.type === 'auth') {
+
+    if (authFailed) {
       clearStoredCookie();
       content.style.display = 'none';
-      showSessionModal({ error: 'Session expired — paste a fresh cookie.' });
-    } else {
-      content.innerHTML = `<div class="error-box" style="margin:14px 16px">Could not load financial data. ${err?.status || 'Network error.'}</div>`;
+      showSessionModal({ error: 'Session rejected — the cookie may have expired. Paste a fresh one.' });
+      return;
     }
+
+    renderFinancials(balance, income, cashflow);
+  } catch (err) {
+    console.error('[loadFinancials] unexpected error:', err);
+    content.innerHTML = `<div class="error-box" style="margin:14px 16px">Could not load financial data — ${err?.status ? 'HTTP ' + err.status : 'network error'}. Check the browser console for details.</div>`;
   }
 }
 
@@ -1408,38 +1425,45 @@ function renderFinancials(bal, inc, cf) {
 ───────────────────────────────────────────────────────────────────────────── */
 async function syncCompanyProfile() {
   try {
-    // Try the company profile endpoint; field names vary across API versions
-    const p = await apiFetch('/api/v2/companies/me/', 'me_profile', true).catch(() => null);
-    if (!p) return;
+    // /api/v3/companies/auth-data/ is the master bootstrap — returns authCompany with adminOverhead.
+    // Fall back to the direct /companies/me/ profile endpoint if auth-data fails.
+    let company = null;
 
-    // Admin overhead — try every known field name
-    const ao = p.adminOverhead     ?? p.admin_overhead
-             ?? p.adminOverheadPct ?? p.admin_overhead_pct
-             ?? p.overhead         ?? null;
+    const authData = await apiFetch('/api/v3/companies/auth-data/', 'me_authdata', true).catch(() => null);
+    if (authData) {
+      company = authData.authCompany ?? authData;
+      console.log('[profile sync] auth-data:', authData);
+    } else {
+      const profile = await apiFetch('/api/v2/companies/me/', 'me_profile', true).catch(() => null);
+      company = profile;
+      console.log('[profile sync] /me/ fallback:', profile);
+    }
+
+    if (!company) { console.warn('[syncCompanyProfile] no company data returned'); return; }
+
+    // Admin overhead (confirmed field: adminOverhead per API docs)
+    const ao = company.adminOverhead ?? company.admin_overhead ?? null;
     if (ao != null && !isNaN(+ao) && +ao >= 0) {
       document.getElementById('aoInput').value = +ao;
       document.getElementById('aoInput').dispatchEvent(new Event('input'));
     }
 
-    // Production speed bonus
-    const psb = p.productionSpeedBonus ?? p.production_speed_bonus
-              ?? p.productionBonus     ?? p.production_bonus
-              ?? p.productionSpeed     ?? null;
+    // Production / sales speed bonuses — not in the documented fields but try common names
+    const psb = company.productionSpeedBonus ?? company.production_speed_bonus
+              ?? company.productionBonus     ?? company.production_bonus
+              ?? null;
     if (psb != null && !isNaN(+psb) && +psb >= 0) {
       document.getElementById('psbInput').value = +psb;
       document.getElementById('psbInput').dispatchEvent(new Event('input'));
     }
 
-    // Sales speed bonus
-    const ssb = p.salesSpeedBonus ?? p.sales_speed_bonus
-              ?? p.salesBonus     ?? p.sales_bonus
+    const ssb = company.salesSpeedBonus ?? company.sales_speed_bonus
+              ?? company.salesBonus     ?? company.sales_bonus
               ?? null;
     if (ssb != null && !isNaN(+ssb) && +ssb >= 0) {
       document.getElementById('ssbInput').value = +ssb;
       document.getElementById('ssbInput').dispatchEvent(new Event('input'));
     }
-
-    console.log('[profile sync]', p);
   } catch (err) {
     console.warn('[syncCompanyProfile] failed:', err);
   }
@@ -1448,6 +1472,19 @@ async function syncCompanyProfile() {
 /* ─────────────────────────────────────────────────────────────────────────────
    SYNC BUILDINGS FROM GAME
 ───────────────────────────────────────────────────────────────────────────── */
+// Reverse-map a building name (from the API) to a BLDS kind letter.
+// The API returns the human-readable name, e.g. "Mine", "Power Plant".
+function bldKindFromName(name) {
+  if (!name) return null;
+  const n = String(name).trim().toLowerCase();
+  // Exact match first
+  const exact = BLDS.find(b => b.n.toLowerCase() === n);
+  if (exact) return exact.k;
+  // Partial match as fallback (e.g. "Car Factory" vs "car factory (speed)")
+  const partial = BLDS.find(b => n.includes(b.n.toLowerCase()) || b.n.toLowerCase().includes(n));
+  return partial ? partial.k : null;
+}
+
 async function syncBuildingsFromGame() {
   if (!getStoredCookie()) { showSessionModal(); return; }
 
@@ -1457,63 +1494,101 @@ async function syncBuildingsFromGame() {
 
   try {
     const data = await apiFetch('/api/v2/companies/me/buildings/', 'me_buildings', true);
+    console.log('[syncBuildingsFromGame] raw response:', data);
+
     if (!Array.isArray(data)) throw new Error('Unexpected response format (not an array)');
 
     const newBuildings = [];
+    let skipped = 0;
+
     for (const b of data) {
-      // Handle both camelCase and snake_case variants used across API versions
-      const bk  = String(b.kind       ?? b.db_letter  ?? b.dbLetter  ?? '');
-      const lvl = +(b.size            ?? b.level       ?? 1);
-      const pk  = +(b.producing_kind  ?? b.producingKind
-                  ?? b.producing      ?? b.selling_kind ?? b.sellingKind ?? 0);
-
-      if (!bk || !pk) continue;
-      const bldDef = BLDS.find(x => x.k === bk);
-      if (!bldDef) { console.log('[sync] unknown building kind:', bk, b); continue; }
-      if (!PROD[pk]) { console.log('[sync] unknown product kind:', pk, b); continue; }
-
-      // Skip buildings under construction (no product yet) or with invalid levels
+      // API docs confirm: name (building type name), size (level).
+      // Product kind is NOT in the documented fields — try every known variant.
+      const lvl = +(b.size ?? b.level ?? 1);
       if (lvl < 1) continue;
+
+      // Resolve building kind: try direct kind fields first, fall back to name lookup
+      let bk = String(b.kind ?? b.db_letter ?? b.dbLetter ?? '');
+      if (!bk || !BLDS.find(x => x.k === bk)) {
+        bk = bldKindFromName(b.name) ?? '';
+      }
+      if (!bk) { console.log('[sync] cannot resolve building kind for:', b); skipped++; continue; }
+
+      const bldDef = BLDS.find(x => x.k === bk);
+      if (!bldDef) { skipped++; continue; }
+
+      // Resolve product kind: try documented and undocumented field variants
+      let pk = +(
+        b.producing_kind   ?? b.producingKind   ??
+        b.production_kind  ?? b.productionKind  ??
+        b.producing        ?? b.product_kind    ??
+        b.productKind      ??
+        b.busy?.kind       ?? b.busy?.resource_kind ??
+        b.busy?.sales_order?.kind ??
+        0
+      );
+
+      // If no product kind from API, use the only option if this building has exactly one
+      if (!pk && bldDef.o.length === 1) {
+        pk = bldDef.o[0];
+      }
+
+      if (!pk || !PROD[pk]) {
+        // Can't determine what this building produces — skip with explanation
+        console.log('[sync] no product kind for building:', b.name ?? bk, '— needs manual entry');
+        skipped++;
+        continue;
+      }
 
       const existing = newBuildings.find(e => e.bk === bk && e.pk === pk && (e.lvl || 1) === lvl);
       if (existing) {
         existing.qty++;
       } else {
         const entry = { bk, pk, qty: 1, lvl };
-        if (bldDef.c  === 'retail')  entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
-        if (bldDef.hasAbundance)     entry.abundance  = 0.6;
+        if (bldDef.c === 'retail')  entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
+        if (bldDef.hasAbundance)    entry.abundance  = 0.6;
         newBuildings.push(entry);
       }
     }
 
-    if (newBuildings.length === 0) {
+    if (newBuildings.length === 0 && data.length > 0) {
+      // We got buildings but couldn't resolve any products — likely the API doesn't
+      // expose producing_kind. Show a helpful message with raw data hint.
       alert(
-        'No buildings could be imported.\n\n' +
-        'Possible reasons:\n' +
-        '• Your company has no buildings yet\n' +
-        '• The API returned an unexpected field format (check the console for details)\n' +
-        '• Some buildings are still under construction (no product kind set)'
+        `Got ${data.length} building(s) from the API but couldn't determine what each one produces.\n\n` +
+        `This usually means the API doesn't include the product kind in the buildings response.\n\n` +
+        `Check the browser console (F12 → Console) — look for "[syncBuildingsFromGame] raw response" ` +
+        `to see exactly what fields the API returns. Share that with the developer to add support.`
       );
       return;
     }
 
+    if (newBuildings.length === 0) {
+      alert('No buildings found in your game account.');
+      return;
+    }
+
+    const skipNote = skipped > 0 ? `\n\n(${skipped} building(s) skipped — product unknown, add manually)` : '';
     const msg = playerBuildings.length > 0
-      ? `Replace your ${playerBuildings.length} existing building(s) with ${newBuildings.length} imported from your game account?`
-      : `Import ${newBuildings.length} building(s) from your game account?`;
+      ? `Replace your ${playerBuildings.length} existing building(s) with ${newBuildings.length} imported from game?${skipNote}`
+      : `Import ${newBuildings.length} building(s) from game?${skipNote}`;
     if (!confirm(msg)) return;
 
     playerBuildings = newBuildings;
     savePlayerBuildings(playerBuildings);
     renderBuildingList();
     recalculate();
-    status(`Imported ${newBuildings.length} buildings from game account.`, false);
+
+    const skipSuffix = skipped > 0 ? ` (${skipped} skipped — add manually)` : '';
+    status(`Imported ${newBuildings.length} buildings from game account.${skipSuffix}`, false);
 
   } catch (err) {
     if (err?.type === 'auth') {
       clearStoredCookie();
       showSessionModal({ error: 'Session expired — paste a fresh cookie.' });
     } else {
-      status(`Import failed: ${err?.message || 'Network error'}`, false);
+      const detail = err?.status ? `HTTP ${err.status}` : (err?.message || 'network error');
+      status(`Import failed: ${detail} — check the browser console (F12) for details.`, false);
       console.error('[syncBuildingsFromGame]', err);
     }
   } finally {
