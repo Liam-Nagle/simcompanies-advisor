@@ -1319,7 +1319,12 @@ document.getElementById('saveSessionBtn').addEventListener('click', async () => 
   }
   saveStoredCookie(val);
   hideSessionModal();
-  await loadFinancials(true);
+  // Load financials + pull company profile (auto-sets AO/speed inputs, non-destructive).
+  // Building import is intentionally kept manual via the "Import from Game" button.
+  await Promise.all([
+    loadFinancials(true),
+    syncCompanyProfile(),
+  ]);
 });
 document.getElementById('cookieInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('saveSessionBtn').click();
@@ -1397,6 +1402,126 @@ function renderFinancials(bal, inc, cf) {
 
   content.innerHTML = gridHtml + txnHtml;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SYNC COMPANY PROFILE (auto-set AO + PSB from game account)
+───────────────────────────────────────────────────────────────────────────── */
+async function syncCompanyProfile() {
+  try {
+    // Try the company profile endpoint; field names vary across API versions
+    const p = await apiFetch('/api/v2/companies/me/', 'me_profile', true).catch(() => null);
+    if (!p) return;
+
+    // Admin overhead — try every known field name
+    const ao = p.adminOverhead     ?? p.admin_overhead
+             ?? p.adminOverheadPct ?? p.admin_overhead_pct
+             ?? p.overhead         ?? null;
+    if (ao != null && !isNaN(+ao) && +ao >= 0) {
+      document.getElementById('aoInput').value = +ao;
+      document.getElementById('aoInput').dispatchEvent(new Event('input'));
+    }
+
+    // Production speed bonus
+    const psb = p.productionSpeedBonus ?? p.production_speed_bonus
+              ?? p.productionBonus     ?? p.production_bonus
+              ?? p.productionSpeed     ?? null;
+    if (psb != null && !isNaN(+psb) && +psb >= 0) {
+      document.getElementById('psbInput').value = +psb;
+      document.getElementById('psbInput').dispatchEvent(new Event('input'));
+    }
+
+    // Sales speed bonus
+    const ssb = p.salesSpeedBonus ?? p.sales_speed_bonus
+              ?? p.salesBonus     ?? p.sales_bonus
+              ?? null;
+    if (ssb != null && !isNaN(+ssb) && +ssb >= 0) {
+      document.getElementById('ssbInput').value = +ssb;
+      document.getElementById('ssbInput').dispatchEvent(new Event('input'));
+    }
+
+    console.log('[profile sync]', p);
+  } catch (err) {
+    console.warn('[syncCompanyProfile] failed:', err);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SYNC BUILDINGS FROM GAME
+───────────────────────────────────────────────────────────────────────────── */
+async function syncBuildingsFromGame() {
+  if (!getStoredCookie()) { showSessionModal(); return; }
+
+  const btn  = document.getElementById('syncBldBtn');
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = 'Syncing…'; btn.disabled = true; }
+
+  try {
+    const data = await apiFetch('/api/v2/companies/me/buildings/', 'me_buildings', true);
+    if (!Array.isArray(data)) throw new Error('Unexpected response format (not an array)');
+
+    const newBuildings = [];
+    for (const b of data) {
+      // Handle both camelCase and snake_case variants used across API versions
+      const bk  = String(b.kind       ?? b.db_letter  ?? b.dbLetter  ?? '');
+      const lvl = +(b.size            ?? b.level       ?? 1);
+      const pk  = +(b.producing_kind  ?? b.producingKind
+                  ?? b.producing      ?? b.selling_kind ?? b.sellingKind ?? 0);
+
+      if (!bk || !pk) continue;
+      const bldDef = BLDS.find(x => x.k === bk);
+      if (!bldDef) { console.log('[sync] unknown building kind:', bk, b); continue; }
+      if (!PROD[pk]) { console.log('[sync] unknown product kind:', pk, b); continue; }
+
+      // Skip buildings under construction (no product yet) or with invalid levels
+      if (lvl < 1) continue;
+
+      const existing = newBuildings.find(e => e.bk === bk && e.pk === pk && (e.lvl || 1) === lvl);
+      if (existing) {
+        existing.qty++;
+      } else {
+        const entry = { bk, pk, qty: 1, lvl };
+        if (bldDef.c  === 'retail')  entry.targetRate = (bldDef.rpph || 0) * lvl * 24;
+        if (bldDef.hasAbundance)     entry.abundance  = 0.6;
+        newBuildings.push(entry);
+      }
+    }
+
+    if (newBuildings.length === 0) {
+      alert(
+        'No buildings could be imported.\n\n' +
+        'Possible reasons:\n' +
+        '• Your company has no buildings yet\n' +
+        '• The API returned an unexpected field format (check the console for details)\n' +
+        '• Some buildings are still under construction (no product kind set)'
+      );
+      return;
+    }
+
+    const msg = playerBuildings.length > 0
+      ? `Replace your ${playerBuildings.length} existing building(s) with ${newBuildings.length} imported from your game account?`
+      : `Import ${newBuildings.length} building(s) from your game account?`;
+    if (!confirm(msg)) return;
+
+    playerBuildings = newBuildings;
+    savePlayerBuildings(playerBuildings);
+    renderBuildingList();
+    recalculate();
+    status(`Imported ${newBuildings.length} buildings from game account.`, false);
+
+  } catch (err) {
+    if (err?.type === 'auth') {
+      clearStoredCookie();
+      showSessionModal({ error: 'Session expired — paste a fresh cookie.' });
+    } else {
+      status(`Import failed: ${err?.message || 'Network error'}`, false);
+      console.error('[syncBuildingsFromGame]', err);
+    }
+  } finally {
+    if (btn) { btn.textContent = orig; btn.disabled = false; }
+  }
+}
+
+document.getElementById('syncBldBtn').addEventListener('click', syncBuildingsFromGame);
 
 /* ─────────────────────────────────────────────────────────────────────────────
    REFRESH BUTTON

@@ -11,10 +11,11 @@
 <!-- ── Session Modal (for optional financial data) ──────────────────────────── -->
 <div id="setupModal" class="modal-backdrop" style="display:none">
   <div class="modal">
-    <div class="modal-title">Load Financial Data</div>
+    <div class="modal-title">Connect to SimCompanies</div>
     <p class="modal-desc">
-      Paste your SimCompanies session cookie to load your balance sheet and transaction history.
-      This is optional — the production calculator works without it.
+      Paste your session cookie to sync your game data: buildings are imported automatically,
+      admin overhead &amp; production speed are set from your company profile, and your
+      balance sheet &amp; transaction history are loaded. All optional — the calculator works without it.
     </p>
     <div class="steps">
       <div class="step"><span class="step-n">1</span>Open <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a> and make sure you're logged in.</div>
@@ -23,7 +24,7 @@
     </div>
     <textarea id="cookieInput" class="cookie-input" placeholder="Paste the full cookie string here…" rows="3"></textarea>
     <div id="setupError" class="setup-error" style="display:none"></div>
-    <button id="saveSessionBtn" class="btn btn-primary">Load Financial Data</button>
+    <button id="saveSessionBtn" class="btn btn-primary">Connect &amp; Sync</button>
   </div>
 </div>
 
@@ -34,7 +35,7 @@
     <div class="hname">SimCompanies Advisor</div>
     <div class="hmeta">Production surplus &amp; deficit calculator</div>
   </div>
-  <button class="btn" id="updateSessionBtn" title="Load financial snapshot (optional)">&#128200; Financial</button>
+  <button class="btn" id="updateSessionBtn" title="Connect to SimCompanies — sync buildings, company profile &amp; financials">&#128200; Sync Account</button>
   <button class="btn" id="refreshBtn">&#8635; Refresh Prices</button>
 </div>
 
@@ -69,7 +70,8 @@
           <input type="number" id="ssbInput" value="0" min="0" step="0.1" class="ao-inp">%
         </label>
       </div>
-      <button class="sbtn" id="clearBldBtn" style="margin-left:auto">Clear All</button>
+      <button class="sbtn" id="syncBldBtn" style="margin-left:auto" title="Import your buildings from SimCompanies (requires session cookie)">&#8659; Import from Game</button>
+      <button class="sbtn" id="clearBldBtn">Clear All</button>
     </div>
 
     <!-- Add building form -->
