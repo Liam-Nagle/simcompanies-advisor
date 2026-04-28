@@ -28,6 +28,7 @@ app.get('/api/*', async (req, res) => {
 
   try {
     const upstream = await fetch(url, {
+      redirect: 'manual',   // don't follow redirects — a 3xx means SimCompanies wants a login
       headers: {
         Cookie:             req.headers['x-sim-cookie'] || '',
         Accept:             'application/json, text/plain, */*',
@@ -38,6 +39,12 @@ app.get('/api/*', async (req, res) => {
         'X-Requested-With': 'XMLHttpRequest',
       },
     });
+
+    // SimCompanies redirects to the login page when the session is invalid.
+    // Treat any redirect as an auth failure so the client gets a clean 401.
+    if (upstream.status >= 300 && upstream.status < 400) {
+      return res.status(401).json({ error: 'auth_required', message: 'Session invalid or expired — please re-sync your cookie.' });
+    }
 
     const body = await upstream.text();
     res.status(upstream.status).type('json').send(body);

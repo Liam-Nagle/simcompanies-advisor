@@ -1517,14 +1517,21 @@ async function syncCompanyProfile() {
     // Fall back to the direct /companies/me/ profile endpoint if auth-data fails.
     let company = null;
 
-    const authData = await apiFetch('/api/v3/companies/auth-data/', 'me_authdata', true).catch(() => null);
+    const cookie = getStoredCookie();
+    console.log('[profile sync] cookie present:', !!cookie, '— length:', cookie.length, '— starts with:', cookie.slice(0, 60));
+
+    const authData = await apiFetch('/api/v3/companies/auth-data/', 'me_authdata', true)
+      .catch(err => { console.warn('[profile sync] auth-data error:', err); return null; });
+    console.log('[profile sync] auth-data result:', authData);
+
     if (authData) {
       company = authData.authCompany ?? authData;
-      console.log('[profile sync] auth-data:', authData);
+      console.log('[profile sync] using auth-data company:', company);
     } else {
-      const profile = await apiFetch('/api/v2/companies/me/', 'me_profile', true).catch(() => null);
+      const profile = await apiFetch('/api/v2/companies/me/', 'me_profile', true)
+        .catch(err => { console.warn('[profile sync] /me/ error:', err); return null; });
       company = profile;
-      console.log('[profile sync] /me/ fallback:', profile);
+      console.log('[profile sync] /me/ fallback result:', profile);
     }
 
     if (!company) { console.warn('[syncCompanyProfile] no company data returned'); return; }
