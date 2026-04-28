@@ -25,9 +25,9 @@ syncBtn.addEventListener('click', () => {
     if (!cookies?.length) { setStatus('err', 'No cookies found'); return; }
     const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
-    // Find an open Advisor tab and post the cookie to it
     chrome.tabs.query({}, (tabs) => {
       const advisorTabs = tabs.filter(t =>
+        t.url?.includes('liam-nagle.github.io/simcompanies-advisor') ||
         t.url?.includes('simcompanies-advisor.onrender.com') ||
         t.url?.includes('localhost')
       );
@@ -35,11 +35,33 @@ syncBtn.addEventListener('click', () => {
         setStatus('err', 'No Advisor tab open');
         return;
       }
+
+      let pushed = 0;
+      let remaining = advisorTabs.length;
+
       for (const tab of advisorTabs) {
-        chrome.tabs.sendMessage(tab.id, { type: 'SC_PUSH_COOKIE', cookie: cookieStr });
+        // Use executeScript to directly post the message into the page.
+        // This works even if the content script hasn't been injected yet
+        // (e.g. tab was open before the extension was loaded).
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          func: (cookie) => {
+            window.postMessage({ type: 'SC_AUTO_COOKIE', cookie }, '*');
+          },
+          args: [cookieStr],
+        }, (results) => {
+          if (!chrome.runtime.lastError && results?.length) pushed++;
+          remaining--;
+          if (remaining === 0) {
+            if (pushed === 0) {
+              setStatus('err', 'Could not inject into Advisor tab — try reloading it');
+            } else {
+              setStatus('ok', 'Cookie pushed!');
+              setTimeout(() => window.close(), 800);
+            }
+          }
+        });
       }
-      setStatus('ok', 'Cookie pushed!');
-      setTimeout(() => window.close(), 800);
     });
   });
 });

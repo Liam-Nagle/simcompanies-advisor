@@ -3,9 +3,10 @@
   "name": "SimCompanies Advisor Connector",
   "version": "1.0",
   "description": "Automatically passes your SimCompanies session to SimCompanies Advisor — no manual cookie copying needed.",
-  "permissions": ["cookies"],
+  "permissions": ["cookies", "tabs", "scripting"],
   "host_permissions": [
-    "https://www.simcompanies.com/*"
+    "https://www.simcompanies.com/*",
+    "https://liam-nagle.github.io/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -13,6 +14,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://liam-nagle.github.io/simcompanies-advisor/*",
         "https://simcompanies-advisor.onrender.com/*",
         "http://localhost:*/*"
       ],
