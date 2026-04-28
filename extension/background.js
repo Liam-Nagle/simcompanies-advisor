@@ -1,17 +1,28 @@
 'use strict';
 
-// Collect all SimCompanies cookies regardless of whether they're set on
-// simcompanies.com or www.simcompanies.com (sessionid lives on the root domain).
+// Collect all SimCompanies cookies across every cookie store Chrome has,
+// regardless of domain variant (simcompanies.com / .simcompanies.com / www.).
 function getAllSimCookies() {
   return new Promise((resolve) => {
-    Promise.all([
-      new Promise(r => chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, r)),
-      new Promise(r => chrome.cookies.getAll({ url: 'https://simcompanies.com' },     r)),
-    ]).then(([www, root]) => {
-      // Merge, keeping the first occurrence of each cookie name (www takes priority)
-      const seen = new Set();
-      const merged = [...www, ...root].filter(c => !seen.has(c.name) && seen.add(c.name));
-      resolve(merged);
+    chrome.cookies.getAllCookieStores((stores) => {
+      const storeIds = (stores || []).map(s => s.id);
+      if (!storeIds.length) storeIds.push('0'); // fallback to default store
+
+      Promise.all(
+        storeIds.map(storeId =>
+          new Promise(r => chrome.cookies.getAll({ storeId }, r))
+        )
+      ).then(results => {
+        const all = results.flat().filter(c =>
+          c.domain.includes('simcompanies.com')
+        );
+        // Deduplicate by name, keeping first occurrence
+        const seen   = new Set();
+        const merged = all.filter(c => !seen.has(c.name) && seen.add(c.name));
+        console.log('[SC Connector] found', merged.length, 'SimCompanies cookies:',
+          merged.map(c => `${c.name}(${c.domain})`).join(', '));
+        resolve(merged);
+      });
     });
   });
 }
@@ -22,13 +33,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   getAllSimCookies().then(cookies => {
     if (!cookies || cookies.length === 0) {
-      sendResponse({ ok: false, error: 'No SimCompanies cookies found. Make sure you\'re logged in at simcompanies.com first.' });
+      sendResponse({ ok: false, error: 'No SimCompanies cookies found. Make sure you\'re logged in at simcompanies.com.' });
       return;
     }
     const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-    console.log('[SC Connector] sending', cookies.length, 'cookies, names:', cookies.map(c => c.name).join(', '));
     sendResponse({ ok: true, cookie: cookieStr });
   });
 
-  return true; // Keep the message channel open for the async response
+  return true;
 });

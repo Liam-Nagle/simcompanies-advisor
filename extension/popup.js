@@ -9,16 +9,22 @@ function setStatus(type, text) {
   statusText.textContent = text;
 }
 
-// Collect cookies from both root and www domains and merge them
+// Collect SimCompanies cookies across all cookie stores
 function getAllSimCookies() {
   return new Promise((resolve) => {
-    Promise.all([
-      new Promise(r => chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, r)),
-      new Promise(r => chrome.cookies.getAll({ url: 'https://simcompanies.com' },     r)),
-    ]).then(([www, root]) => {
-      const seen   = new Set();
-      const merged = [...www, ...root].filter(c => !seen.has(c.name) && seen.add(c.name));
-      resolve(merged);
+    chrome.cookies.getAllCookieStores((stores) => {
+      const storeIds = (stores || []).map(s => s.id);
+      if (!storeIds.length) storeIds.push('0');
+      Promise.all(
+        storeIds.map(storeId =>
+          new Promise(r => chrome.cookies.getAll({ storeId }, r))
+        )
+      ).then(results => {
+        const all    = results.flat().filter(c => c.domain.includes('simcompanies.com'));
+        const seen   = new Set();
+        const merged = all.filter(c => !seen.has(c.name) && seen.add(c.name));
+        resolve(merged);
+      });
     });
   });
 }
