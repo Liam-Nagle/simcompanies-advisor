@@ -8,20 +8,32 @@
 </head>
 <body>
 
-<!-- ── Session Modal (for optional financial data) ──────────────────────────── -->
+<!-- ── Session Modal ─────────────────────────────────────────────────────────── -->
 <div id="setupModal" class="modal-backdrop" style="display:none">
   <div class="modal">
     <div class="modal-title">Connect to SimCompanies</div>
-    <p class="modal-desc">
-      Paste your session cookie to sync your game data: buildings are imported automatically,
-      admin overhead &amp; production speed are set from your company profile, and your
-      balance sheet &amp; transaction history are loaded. All optional — the calculator works without it.
-    </p>
-    <div class="steps">
-      <div class="step"><span class="step-n">1</span>Open <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a> and make sure you're logged in.</div>
-      <div class="step"><span class="step-n">2</span>Press <kbd>F12</kbd> → <strong>Network</strong> tab → reload the page.</div>
-      <div class="step"><span class="step-n">3</span>Click any request to <code>www.simcompanies.com</code>, scroll to <strong>Request Headers</strong>, copy the full <code>cookie:</code> value.</div>
+
+    <!-- Method 1: Extension -->
+    <div class="method-block">
+      <div class="method-label">&#9889; Automatic method &mdash; install once, works forever</div>
+      <div class="method-desc">
+        Install the companion browser extension &mdash; it automatically passes your session every time you open the Advisor, with no copying needed.
+      </div>
+      <div class="steps" style="margin-bottom:0">
+        <div class="step"><span class="step-n">1</span>In Chrome go to <code>chrome://extensions</code> &rarr; enable <strong>Developer mode</strong> (top-right toggle).</div>
+        <div class="step"><span class="step-n">2</span>Click <strong>Load unpacked</strong> &rarr; select the <code>extension/</code> folder from the project files.</div>
+        <div class="step"><span class="step-n">3</span>Done &mdash; open this page while logged into SimCompanies and it connects automatically.</div>
+      </div>
     </div>
+
+    <div class="method-divider"><span>or paste manually</span></div>
+
+    <!-- Method 2: Manual -->
+    <div class="steps" style="margin-bottom:14px">
+      <div class="step"><span class="step-n">1</span>On <a href="https://www.simcompanies.com" target="_blank">simcompanies.com</a>, press <kbd>F12</kbd> &rarr; <strong>Network</strong> tab &rarr; reload the page.</div>
+      <div class="step"><span class="step-n">2</span>Click any request to <code>simcompanies.com</code> &rarr; <strong>Request Headers</strong> &rarr; copy the full <code>cookie:</code> value and paste below.</div>
+    </div>
+
     <textarea id="cookieInput" class="cookie-input" placeholder="Paste the full cookie string here…" rows="3"></textarea>
     <div id="setupError" class="setup-error" style="display:none"></div>
     <button id="saveSessionBtn" class="btn btn-primary">Connect &amp; Sync</button>

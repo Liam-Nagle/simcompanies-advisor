@@ -1808,6 +1808,33 @@ function iconHtml(kind) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   BROWSER EXTENSION CONNECTOR
+   The companion extension (extension/ folder) posts SC_AUTO_COOKIE on page load,
+   passing the full SimCompanies cookie string directly — no manual copying needed.
+───────────────────────────────────────────────────────────────────────────── */
+window.addEventListener('message', (event) => {
+  if (event.source !== window || event.data?.type !== 'SC_AUTO_COOKIE') return;
+  const { cookie, error } = event.data;
+
+  if (!cookie) {
+    // Extension is installed but user isn't logged into SimCompanies
+    if (error) console.warn('[SC Connector]', error);
+    return;
+  }
+
+  const isNew = cookie !== getStoredCookie();
+  saveStoredCookie(cookie);
+
+  if (isNew) {
+    status('Session synced via extension — loading account data…', true);
+    Promise.all([loadFinancials(true), syncCompanyProfile()]);
+  } else {
+    // Cookie hasn't changed — still trigger a sync if we don't have warehouse data yet
+    if (!Object.keys(warehouseStock).length) syncCompanyProfile();
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
    BOOT
 ───────────────────────────────────────────────────────────────────────────── */
 (async () => {

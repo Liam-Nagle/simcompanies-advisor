@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: system-ui, sans-serif; width: 240px; padding: 14px; background: #1a1d2e; color: #e2e8f0; font-size: 13px; }
+    h2 { font-size: 14px; font-weight: 700; margin-bottom: 4px; color: #fbbf24; }
+    p  { font-size: 12px; color: #7986b0; line-height: 1.5; margin-bottom: 12px; }
+    .status { display: flex; align-items: center; gap: 8px; background: #242840; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-g { background: #22c55e; } .dot-r { background: #ef4444; } .dot-y { background: #f59e0b; }
+    button { width: 100%; background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h2>&#127981; SC Advisor Connector</h2>
+  <p>Automatically passes your SimCompanies session to the Advisor tool.</p>
+  <div class="status">
+    <div class="dot dot-y" id="dot"></div>
+    <span id="statusText">Checking…</span>
+  </div>
+  <button id="syncBtn">Push Cookie to Advisor</button>
+  <script src="popup.js"></script>
+</body>
+</html>

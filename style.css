@@ -137,6 +137,18 @@ tbody tr:hover{background:rgba(255,255,255,.018)}
 .cookie-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;resize:vertical;margin-bottom:10px}
 .cookie-input:focus{outline:none;border-color:var(--blue)}
 .setup-error{color:#fca5a5;font-size:12px;margin-bottom:10px}
+/* Bookmarklet method */
+.method-block{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:16px}
+.method-label{font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.method-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.method-desc a{color:var(--blue)}
+.bookmarklet-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bookmarklet-link{display:inline-flex;align-items:center;gap:6px;background:var(--blue);color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:6px;text-decoration:none;cursor:grab;user-select:none;border:2px dashed rgba(255,255,255,.35);white-space:nowrap}
+.bookmarklet-link:hover{background:#2563eb}
+.bookmarklet-link:active{cursor:grabbing}
+.bookmarklet-hint{font-size:12px;color:var(--muted);font-style:italic}
+.method-divider{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.method-divider::before,.method-divider::after{content:'';flex:1;height:1px;background:var(--border)}
 .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;padding:8px 20px}
 .btn-primary:hover{background:#2563eb}
 

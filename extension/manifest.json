@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SimCompanies Advisor Connector",
+  "version": "1.0",
+  "description": "Automatically passes your SimCompanies session to SimCompanies Advisor — no manual cookie copying needed.",
+  "permissions": ["cookies"],
+  "host_permissions": [
+    "https://www.simcompanies.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://simcompanies-advisor.onrender.com/*",
+        "http://localhost:*/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SimCompanies Advisor Connector"
+  }
+}
