@@ -1340,7 +1340,7 @@ async function wakeServer() {
       const t    = setTimeout(() => ctrl.abort(), TIMEOUT);
       const res  = await fetch(`${PROXY_URL}/ping`, { signal: ctrl.signal });
       clearTimeout(t);
-      if (res.ok) return; // server is up — proceed
+      if (res.status < 500) return; // any non-server-error response = server is awake
     } catch { /* still sleeping — fall through to retry */ }
 
     const elapsed = Math.round((Date.now() - start) / 1000);
