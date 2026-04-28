@@ -10,7 +10,7 @@ function setStatus(type, text) {
 }
 
 // Check if cookies are available
-chrome.cookies.getAll({ domain: 'simcompanies.com' }, (cookies) => {
+chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, (cookies) => {
   if (!cookies || cookies.length === 0) {
     setStatus('err', 'Not logged in to SimCompanies');
     syncBtn.disabled = true;
@@ -21,7 +21,7 @@ chrome.cookies.getAll({ domain: 'simcompanies.com' }, (cookies) => {
 
 // Manual push button — injects the cookie into any open Advisor tab
 syncBtn.addEventListener('click', () => {
-  chrome.cookies.getAll({ domain: 'simcompanies.com' }, (cookies) => {
+  chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, (cookies) => {
     if (!cookies?.length) { setStatus('err', 'No cookies found'); return; }
     const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 

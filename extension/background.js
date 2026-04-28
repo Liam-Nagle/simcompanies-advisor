@@ -6,7 +6,7 @@
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type !== 'SC_GET_COOKIE') return;
 
-  chrome.cookies.getAll({ domain: 'simcompanies.com' }, (cookies) => {
+  chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, (cookies) => {
     if (!cookies || cookies.length === 0) {
       sendResponse({ ok: false, error: 'No SimCompanies cookies found. Make sure you\'re logged in at simcompanies.com first.' });
       return;
