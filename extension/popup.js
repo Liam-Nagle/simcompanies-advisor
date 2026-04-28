@@ -29,26 +29,23 @@ function getAllSimCookies() {
   });
 }
 
-// Check login status on popup open
-getAllSimCookies().then(cookies => {
-  if (!cookies || cookies.length === 0) {
-    setStatus('err', 'Not logged in to SimCompanies');
-    syncBtn.disabled = true;
+// Check login status on popup open — prefer the intercepted cookie
+chrome.storage.local.get('capturedCookie', (result) => {
+  if (result.capturedCookie && result.capturedCookie.includes('sessionid')) {
+    setStatus('ok', 'Session ready — click to push to Advisor');
   } else {
-    const hasSession = cookies.some(c => c.name === 'sessionid');
-    if (hasSession) {
-      setStatus('ok', `Logged in — ${cookies.length} cookies found`);
-    } else {
-      setStatus('warn', `${cookies.length} cookies found but no sessionid — try logging in again`);
-    }
+    setStatus('warn', 'Waiting for SimCompanies session — browse simcompanies.com first');
   }
 });
 
 // Manual push button
 syncBtn.addEventListener('click', () => {
-  getAllSimCookies().then(cookies => {
-    if (!cookies?.length) { setStatus('err', 'No cookies found'); return; }
-    const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  chrome.storage.local.get('capturedCookie', (result) => {
+    const cookieStr = result.capturedCookie || '';
+    if (!cookieStr || !cookieStr.includes('sessionid')) {
+      setStatus('err', 'No session found — browse simcompanies.com while logged in first');
+      return;
+    }
 
     chrome.tabs.query({}, (tabs) => {
       const advisorTabs = tabs.filter(t =>

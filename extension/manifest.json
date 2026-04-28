@@ -3,7 +3,7 @@
   "name": "SimCompanies Advisor Connector",
   "version": "1.0",
   "description": "Automatically passes your SimCompanies session to SimCompanies Advisor — no manual cookie copying needed.",
-  "permissions": ["cookies", "tabs", "scripting"],
+  "permissions": ["cookies", "tabs", "scripting", "webRequest", "storage"],
   "host_permissions": [
     "https://simcompanies.com/*",
     "https://www.simcompanies.com/*",
