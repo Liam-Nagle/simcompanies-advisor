@@ -15,6 +15,10 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Health check ──────────────────────────────────────────────────────────────
+// Lightweight wake-up endpoint — no proxying, just confirms the server is alive.
+app.get('/ping', (req, res) => res.json({ ok: true }));
+
 // ── Proxy ─────────────────────────────────────────────────────────────────────
 // Forward every /api/* path to simcompanies.com, injecting the caller's
 // session cookie from the X-Sim-Cookie request header.

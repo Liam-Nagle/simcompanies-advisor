@@ -1323,6 +1323,37 @@ async function loadEncyclopedia(force = false) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   SERVER WAKE-UP
+   SnapDeploy containers sleep when idle and take ~30s to cold-start.
+   This pings /ping repeatedly and shows a live countdown so the user knows
+   what's happening.  Resolves as soon as the server responds (or times out).
+───────────────────────────────────────────────────────────────────────────── */
+async function wakeServer() {
+  const MAX_MS  = 90_000;  // give up after 90s
+  const RETRY   = 2_000;   // re-ping every 2s
+  const TIMEOUT = 5_000;   // abort each individual attempt after 5s
+  const start   = Date.now();
+
+  while (true) {
+    try {
+      const ctrl = new AbortController();
+      const t    = setTimeout(() => ctrl.abort(), TIMEOUT);
+      const res  = await fetch(`${PROXY_URL}/ping`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (res.ok) return; // server is up — proceed
+    } catch { /* still sleeping — fall through to retry */ }
+
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    if (Date.now() - start >= MAX_MS) {
+      status('Server is not responding — try refreshing in a moment.', false);
+      return;
+    }
+    status(`Server waking up… ${elapsed}s (usually ~30s on first load)`, true);
+    await new Promise(r => setTimeout(r, RETRY));
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
    TICKER LOAD
 ───────────────────────────────────────────────────────────────────────────── */
 async function loadTicker(force = false) {
@@ -1876,7 +1907,8 @@ window.addEventListener('message', (event) => {
   document.getElementById('psbInput').value = getPSB();
   document.getElementById('ssbInput').value = getSSB();
   renderBuildingList();
-  status('Initializing…', true);
+  status('Connecting to server…', true);
+  await wakeServer();
   await Promise.all([loadEncyclopedia(), loadBuildingConstants()]);
   loadTicker();
   // If the user already has a stored cookie, auto-load account data on every page load
