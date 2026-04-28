@@ -3,7 +3,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    CONFIG
 ───────────────────────────────────────────────────────────────────────────── */
-const PROXY_URL  = 'https://simcompanies-advisor.onrender.com';
+const PROXY_URL  = 'https://osrs-bingo-bot.containers.snapdeploy.dev';
 const BASE       = 'https://www.simcompanies.com';
 const TTL        = 5 * 60 * 1000;
 const ENCYC_TTL  = 6 * 60 * 60 * 1000;
@@ -301,7 +301,7 @@ function setSSB(v) { localStorage.setItem('sc_ssb', String(v)); }
 let surRows = [];
 let defRows = [];
 const sortSt = {
-  s: { col: 'mv',      dir: 'desc' },
+  s: { col: 'netMV',   dir: 'desc' },
   d: { col: 'buyCost', dir: 'desc' },
 };
 
@@ -670,7 +670,10 @@ function calculate() {
     const price = marketMap2[kind] || 0;
 
     if (net > 0) {
-      surRows.push({ kind, name, produced: p, consumed: c, net, price, mv: net * price });
+      const grossMV     = net * price;
+      const costPerUnit = calcCostPerUnit(kind, marketMap2);
+      const netMV       = costPerUnit != null ? net * (price - costPerUnit) : grossMV;
+      surRows.push({ kind, name, produced: p, consumed: c, net, price, mv: grossMV, netMV, hasNetCost: costPerUnit != null });
     } else {
       const deficit  = Math.abs(net);
       const buyCost  = deficit * price;
@@ -715,6 +718,36 @@ function calcMVB(kindId, deficitPerDay, marketMap) {
   };
 }
 
+// Returns the weighted-average production cost per unit for a given resource,
+// computed from the player's own buildings.  Returns null if no buildings
+// produce this resource (gross price should be used as fallback).
+function calcCostPerUnit(kindId, mkt) {
+  const psb = 1 + getPSB() / 100;
+  const ao  = getAO();
+  let totalUnits = 0;
+  let totalCost  = 0;
+
+  for (const e of playerBuildings) {
+    if (e.pk !== kindId) continue;
+    const bld  = BLDS.find(b => b.k === e.bk);
+    const prod = PROD[+e.pk];
+    if (!bld || !prod || bld.c === 'retail') continue;
+    const lvl      = e.lvl || 1;
+    const qty      = e.qty || 1;
+    const ab       = getAbundance(e);
+    const pphEff   = prod.pph * lvl * psb * ab;
+    const unitsDay = pphEff * 24 * qty;
+    if (unitsDay <= 0) continue;
+    const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+    const wagDay = bld.w * lvl * 24 * qty * (1 + ao / 100);
+    const matDay = pphEff * 24 * matCPU * qty;
+    totalUnits += unitsDay;
+    totalCost  += wagDay + matDay;
+  }
+
+  return totalUnits > 0 ? totalCost / totalUnits : null;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────────
    SORT
 ───────────────────────────────────────────────────────────────────────────── */
@@ -755,7 +788,7 @@ function renderSurplus() {
       <td class="num">${fmtN(r.produced)}</td>
       <td class="num">${fmtN(r.consumed)}</td>
       <td class="num" style="color:var(--green)">+${fmtN(r.net)}</td>
-      <td class="num" style="color:var(--gold)">${fmtSC(r.mv)}</td>
+      <td class="num" style="color:var(--gold)">${fmtSC(r.netMV)}${!r.hasNetCost ? ' <span style="color:var(--muted);font-size:10px" title="No buildings producing this — showing gross market value">(gross)</span>' : ''}</td>
       ${hasStock ? stockCell(r.kind, r.net) : ''}
     </tr>`).join('');
 }
