@@ -5,6 +5,7 @@
   "description": "Automatically passes your SimCompanies session to SimCompanies Advisor — no manual cookie copying needed.",
   "permissions": ["cookies", "tabs", "scripting"],
   "host_permissions": [
+    "https://simcompanies.com/*",
     "https://www.simcompanies.com/*",
     "https://liam-nagle.github.io/*"
   ],

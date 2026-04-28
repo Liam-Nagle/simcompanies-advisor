@@ -9,19 +9,38 @@ function setStatus(type, text) {
   statusText.textContent = text;
 }
 
-// Check if cookies are available
-chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, (cookies) => {
+// Collect cookies from both root and www domains and merge them
+function getAllSimCookies() {
+  return new Promise((resolve) => {
+    Promise.all([
+      new Promise(r => chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, r)),
+      new Promise(r => chrome.cookies.getAll({ url: 'https://simcompanies.com' },     r)),
+    ]).then(([www, root]) => {
+      const seen   = new Set();
+      const merged = [...www, ...root].filter(c => !seen.has(c.name) && seen.add(c.name));
+      resolve(merged);
+    });
+  });
+}
+
+// Check login status on popup open
+getAllSimCookies().then(cookies => {
   if (!cookies || cookies.length === 0) {
     setStatus('err', 'Not logged in to SimCompanies');
     syncBtn.disabled = true;
   } else {
-    setStatus('ok', `Logged in — ${cookies.length} cookies found`);
+    const hasSession = cookies.some(c => c.name === 'sessionid');
+    if (hasSession) {
+      setStatus('ok', `Logged in — ${cookies.length} cookies found`);
+    } else {
+      setStatus('warn', `${cookies.length} cookies found but no sessionid — try logging in again`);
+    }
   }
 });
 
-// Manual push button — injects the cookie into any open Advisor tab
+// Manual push button
 syncBtn.addEventListener('click', () => {
-  chrome.cookies.getAll({ url: 'https://www.simcompanies.com' }, (cookies) => {
+  getAllSimCookies().then(cookies => {
     if (!cookies?.length) { setStatus('err', 'No cookies found'); return; }
     const cookieStr = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
@@ -40,9 +59,6 @@ syncBtn.addEventListener('click', () => {
       let remaining = advisorTabs.length;
 
       for (const tab of advisorTabs) {
-        // Use executeScript to directly post the message into the page.
-        // This works even if the content script hasn't been injected yet
-        // (e.g. tab was open before the extension was loaded).
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: (cookie) => {
