@@ -1328,23 +1328,31 @@ async function loadEncyclopedia(force = false) {
    This pings /ping repeatedly and shows a live countdown so the user knows
    what's happening.  Resolves as soon as the server responds (or times out).
 ───────────────────────────────────────────────────────────────────────────── */
-async function wakeServer() {
+// Cached promise — both the boot path and the cookie-sync path can call
+// wakeServer() and they all wait on the same underlying operation.
+let _wakePromise = null;
+function wakeServer() {
+  if (!_wakePromise) _wakePromise = _wakeServerImpl();
+  return _wakePromise;
+}
+async function _wakeServerImpl() {
   const MAX_MS  = 90_000;  // give up after 90s
   const RETRY   = 2_000;   // re-ping every 2s
   const TIMEOUT = 5_000;   // abort each individual attempt after 5s
   const start   = Date.now();
 
-  // Two wake-up shots fired in parallel before any polling:
-  //
-  // 1. Image probe — browsers load images with NO Origin header and NO CORS
-  //    check at all.  The request always reaches the platform regardless of
-  //    what headers SnapDeploy's sleep-proxy returns.  The image "fails" to
-  //    decode (JSON ≠ image) but the HTTP request is sent and that's enough.
-  const _wakeImg = new Image();
-  _wakeImg.src = `${PROXY_URL}/ping?_wake=${Date.now()}`;
-  //
-  // 2. no-cors fetch — also bypasses CORS blocking on the response side.
-  fetch(`${PROXY_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
+  // Wake the container with a hidden iframe.
+  // fetch(), no-cors fetch, and image probes all fail to wake SnapDeploy because
+  // their cold-start proxy only triggers container boot on real browser navigation
+  // requests (Accept: text/html, proper Referer, no cross-origin fetch headers).
+  // An iframe IS a real browser navigation — it looks identical to the user typing
+  // the URL into a new tab, which is the one thing that reliably wakes the container.
+  const _wakeFrame = document.createElement('iframe');
+  _wakeFrame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+  _wakeFrame.src = `${PROXY_URL}/ping?_wake=${Date.now()}`;
+  document.body.appendChild(_wakeFrame);
+  // Clean up the iframe after 15s — by then the container is either awake or won't be.
+  setTimeout(() => _wakeFrame.remove(), 15_000);
 
   while (true) {
     try {
@@ -1916,10 +1924,13 @@ window.addEventListener('message', (event) => {
 
   if (isNew) {
     status('Session synced via extension — loading account data…', true);
-    Promise.all([loadFinancials(true), syncCompanyProfile()]);
+    // Wait for the server to be fully awake before firing API calls.
+    // wakeServer() returns the same cached promise as the boot path, so if
+    // the server is already up this resolves immediately.
+    wakeServer().then(() => Promise.all([loadFinancials(true), syncCompanyProfile()]));
   } else {
     // Cookie hasn't changed — still trigger a sync if we don't have warehouse data yet
-    if (!Object.keys(warehouseStock).length) syncCompanyProfile();
+    if (!Object.keys(warehouseStock).length) wakeServer().then(() => syncCompanyProfile());
   }
 });
 
