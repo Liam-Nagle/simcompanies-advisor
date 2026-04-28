@@ -1334,14 +1334,31 @@ async function wakeServer() {
   const TIMEOUT = 5_000;   // abort each individual attempt after 5s
   const start   = Date.now();
 
+  // Two wake-up shots fired in parallel before any polling:
+  //
+  // 1. Image probe — browsers load images with NO Origin header and NO CORS
+  //    check at all.  The request always reaches the platform regardless of
+  //    what headers SnapDeploy's sleep-proxy returns.  The image "fails" to
+  //    decode (JSON ≠ image) but the HTTP request is sent and that's enough.
+  const _wakeImg = new Image();
+  _wakeImg.src = `${PROXY_URL}/ping?_wake=${Date.now()}`;
+  //
+  // 2. no-cors fetch — also bypasses CORS blocking on the response side.
+  fetch(`${PROXY_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
+
   while (true) {
     try {
       const ctrl = new AbortController();
       const t    = setTimeout(() => ctrl.abort(), TIMEOUT);
       const res  = await fetch(`${PROXY_URL}/ping`, { signal: ctrl.signal });
       clearTimeout(t);
-      if (res.status < 500) return; // any non-server-error response = server is awake
-    } catch { /* still sleeping — fall through to retry */ }
+      // Only trust a real { ok: true } JSON reply from our Express server.
+      // SnapDeploy's sleep-proxy can return 200 OK with an HTML splash page
+      // before Express has started — checking the JSON body avoids a false positive.
+      if (res.ok) {
+        try { const j = await res.json(); if (j?.ok) return; } catch {}
+      }
+    } catch { /* CORS error or network error — container still waking */ }
 
     const elapsed = Math.round((Date.now() - start) / 1000);
     if (Date.now() - start >= MAX_MS) {
@@ -1404,6 +1421,7 @@ document.getElementById('loadFinBtn').addEventListener('click', () => {
   document.getElementById('cookieInput').value = getStoredCookie();
   showSessionModal();
 });
+document.getElementById('modalCloseBtn').addEventListener('click', hideSessionModal);
 document.getElementById('saveSessionBtn').addEventListener('click', async () => {
   const val = document.getElementById('cookieInput').value.trim();
   if (!val) {
