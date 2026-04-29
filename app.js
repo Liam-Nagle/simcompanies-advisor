@@ -1490,7 +1490,10 @@ function applyBuildingConstants(data) {
 async function loadBuildingConstants(force = false) {
   if (!force) {
     const cached = cGet('bldConst', ENCYC_TTL);
-    if (cached) { applyBuildingConstants(cached); return; }
+    // Temporarily bypass cache so the debug log fires on every load.
+    // Remove this bypass once we've confirmed the API field names.
+    if (cached) applyBuildingConstants(cached); // still apply cached data immediately
+    // fall through to also fetch fresh so the sample log fires
   }
   try {
     const res = await fetch(`${PROXY_URL}/api/v2/constants/buildings/`);
@@ -1506,10 +1509,16 @@ async function loadBuildingConstants(force = false) {
 
   // Probe: check whether the encyclopedia has a buildings section with construction costs.
   // Try a few likely URL patterns — log whatever comes back so we can see the structure.
+  // Web URL is /encyclopedia/0/building/{letter}/ so API mirrors our resource pattern:
+  // resources: /api/v4/en/0/encyclopedia/resources/0/{k}/
+  // buildings: /api/v4/en/0/encyclopedia/buildings/0/{letter}/  (most likely)
   const probePaths = [
-    '/api/v4/en/0/encyclopedia/buildings/',
-    '/api/v3/encyclopedia/buildings/',
-    '/api/v2/encyclopedia/buildings/',
+    '/api/v4/en/0/encyclopedia/buildings/0/P/',   // Farm — plural "buildings" + realm 0
+    '/api/v4/en/0/encyclopedia/building/0/P/',    // Farm — singular "building" + realm 0
+    '/api/v4/en/0/encyclopedia/buildings/0/F/',   // Ranch — in case letter matters
+    '/api/v4/en/0/encyclopedia/building/0/F/',    // Ranch singular
+    '/api/v4/en/0/encyclopedia/buildings/P/',     // without realm segment
+    '/api/v4/en/0/encyclopedia/building/P/',      // singular without realm
   ];
   for (const path of probePaths) {
     try {
