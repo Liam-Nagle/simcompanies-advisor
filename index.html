@@ -8,6 +8,66 @@
 </head>
 <body>
 
+<!-- ── Opportunities Modal ──────────────────────────────────────────────────── -->
+<div id="oppModal" class="modal-backdrop" style="display:none">
+  <div class="modal modal-wide">
+    <button id="oppModalClose" class="modal-close" title="Close">&times;</button>
+    <div class="modal-title">&#128200; Building Opportunities</div>
+
+    <div class="opp-tab-bar">
+      <button class="opp-tab active" data-opp-tab="build">&#128200; Best to Build</button>
+      <button class="opp-tab"        data-opp-tab="upgrade">&#8679; Best to Upgrade</button>
+    </div>
+
+    <!-- Best to Build pane -->
+    <div id="opp-pane-build" class="opp-pane">
+      <div class="opp-controls">
+        <label class="ao-label">Level
+          <input type="number" id="oppMLevel" value="1" min="1" max="15" class="ao-inp" style="width:44px">
+        </label>
+        <button class="sbtn" id="oppMOwnedBtn">Owned only</button>
+        <input id="oppMSearch" type="search" placeholder="Filter building or product…"
+               style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 8px;font-size:11px;width:180px;outline:none;color-scheme:dark;margin-left:auto">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Product</th>
+              <th class="num">Profit/day</th>
+              <th>Covers a Deficit?</th>
+              <th class="num">Build Cost</th>
+              <th class="num">Payback</th>
+            </tr>
+          </thead>
+          <tbody id="oppMBuildTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Best to Upgrade pane -->
+    <div id="opp-pane-upgrade" class="opp-pane" style="display:none">
+      <p id="oppMUpgNote" style="font-size:12px;color:var(--amber);margin:0 0 12px"></p>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Product</th>
+              <th class="num">Level</th>
+              <th class="num">Gain/day</th>
+              <th class="num">Upgrade Cost</th>
+              <th class="num">Payback</th>
+            </tr>
+          </thead>
+          <tbody id="oppMUpgTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Session Modal ─────────────────────────────────────────────────────────── -->
 <div id="setupModal" class="modal-backdrop" style="display:none">
   <div class="modal">
@@ -49,6 +109,7 @@
     <div class="hmeta">Production surplus &amp; deficit calculator</div>
   </div>
   <button class="btn" id="updateSessionBtn" title="Connect to SimCompanies — sync buildings, company profile &amp; financials">&#128200; Sync Account</button>
+  <button class="btn" id="oppModalBtn" title="See which buildings to build or upgrade for the best ROI">&#128202; Opportunities</button>
   <button class="btn" id="refreshBtn">&#8635; Refresh Prices</button>
 </div>
 

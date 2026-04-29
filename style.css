@@ -152,6 +152,15 @@ tbody tr:hover{background:rgba(255,255,255,.018)}
 .bookmarklet-hint{font-size:12px;color:var(--muted);font-style:italic}
 .method-divider{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
 .method-divider::before,.method-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+/* ── Opportunities Modal ─────────────────────────────────── */
+.modal-wide{max-width:960px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-wide .tbl-wrap{overflow-y:auto;max-height:calc(90vh - 200px)}
+.opp-tab-bar{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-shrink:0}
+.opp-tab{background:none;border:1px solid transparent;color:var(--muted);padding:5px 16px;border-radius:6px;font-size:13px;cursor:pointer}
+.opp-tab:hover{color:var(--text);background:var(--bg3)}
+.opp-tab.active{color:var(--blue);border-color:var(--blue);background:rgba(59,130,246,.08);font-weight:600}
+.opp-pane{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.opp-controls{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;flex-shrink:0}
 .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;padding:8px 20px}
 .btn-primary:hover{background:#2563eb}
 

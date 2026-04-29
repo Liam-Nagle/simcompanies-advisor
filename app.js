@@ -554,10 +554,8 @@ function renderBuildingList() {
         const nxt1  = calcBuildingProfit(e.bk, e.pk, lvl + 1, 1, abundance);
         if (curr1 && nxt1) {
           const gain    = nxt1.profitDay - curr1.profitDay;
-          const upgCU   = bld.costUnits != null ? bld.costUnits * lvl : null;
-          const cuP     = mkt2[111] || 0;
-          const upgCost = upgCU != null && cuP > 0 ? upgCU * cuP : null;
-          const payback = upgCost != null && gain > 0 ? Math.ceil(upgCost / gain) : null;
+          const upgCost = getUpgradeCost(bld, lvl, mkt2) || null;
+          const payback = upgCost && gain > 0 ? Math.ceil(upgCost / gain) : null;
           const gc      = gain >= 0 ? 'var(--green)' : 'var(--red)';
           const totalNote = e.qty > 1 ? ` (×${e.qty} = ${gain>=0?'+':''}${fmtSC(gain*e.qty)}/day)` : '';
           const payNote   = payback != null ? ` · ${payback}d payback` : '';
@@ -612,13 +610,34 @@ function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
   return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay, pphEff, ab };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   UPGRADE / BUILD COST HELPERS
+───────────────────────────────────────────────────────────────────────────── */
+// True if the buildings API has given us construction material data for this building.
+function hasBuildMaterials(bld) {
+  return Array.isArray(bld.buildMats) && bld.buildMats.length > 0;
+}
+
+// Cost to upgrade a building from `fromLvl` to `fromLvl + 1`.
+// Formula: fromLvl × (CU_count × CU_price  +  Σ material_amount × material_price)
+// Falls back to CU-only when buildMats data is not available.
+function getUpgradeCost(bld, fromLvl, mkt) {
+  const cuP = mkt[111] || 0;
+  const cuN = bld.costUnits || 0;
+  let matCost = 0;
+  if (hasBuildMaterials(bld)) {
+    for (const m of bld.buildMats) matCost += m.a * (mkt[m.k] || 0);
+  }
+  return fromLvl * (cuN * cuP + matCost);
+}
+
 function recalculate() {
   if (!ticker.length) return;
   calculate();
   renderSurplus();
   renderDeficit();
   updateSummary();
-  renderOpportunities();
+  // Opportunities panel is rendered on demand (via the modal button) — not auto-shown here.
   if (Object.keys(warehouseStock).length) updateWarehouseDisplay(document.getElementById('whSearch')?.value || '');
 }
 
@@ -807,9 +826,21 @@ function renderDeficit() {
   const defCols = hasStock ? 8 : 7;
 
   document.getElementById('defTbody').innerHTML = defRows.map((r, i) => {
-    const chipHtml = r.mvb
-      ? `<span class="chip chip-${r.rec}">${r.rec === 'buy' ? 'Buy' : 'Make'} &mdash; save ${fmtSC(r.mvb.saving)}/day</span>`
-      : `<span style="color:var(--muted);font-size:11px">—</span>`;
+    const chipHtml = r.mvb ? (() => {
+      const m = r.mvb;
+      if (r.rec === 'buy') {
+        return `<span class="chip chip-buy">Buy &mdash; save ${fmtSC(m.saving)}/day</span>`;
+      }
+      // Compute surplus net value: full building profit minus the deficit-only saving.
+      // bldProfitDay already accounts for all production (deficit portion + surplus),
+      // so the difference is approximately what the surplus earns after costs.
+      const surplusVal = m.bldProfitDay !== null ? m.bldProfitDay - m.saving : null;
+      let label = `Make &mdash; saves ${fmtSC(m.saving)}/day on deficit`;
+      if (surplusVal !== null && surplusVal > 100) {
+        label += ` &middot; <span style="color:var(--green)">+${fmtSC(surplusVal)}/day surplus</span>`;
+      }
+      return `<span class="chip chip-make">${label}</span>`;
+    })() : `<span style="color:var(--muted);font-size:11px">—</span>`;
     // For deficit: show stock and how many days of cover remain
     const stockHtml = hasStock ? stockCell(r.kind, Math.abs(r.net)) : '';
 
@@ -1000,11 +1031,199 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   OPPORTUNITIES MODAL
+───────────────────────────────────────────────────────────────────────────── */
+let oppMTab    = 'build';
+let oppMLevel  = 1;
+let oppMOwned  = false;
+let oppMSearch = '';
+
+function openOppModal() {
+  document.getElementById('oppModal').style.display = 'flex';
+  renderOppModal();
+}
+function closeOppModal() {
+  document.getElementById('oppModal').style.display = 'none';
+}
+function renderOppModal() {
+  if (oppMTab === 'build') renderOppBuild();
+  else                     renderOppUpgrade();
+}
+
+function renderOppBuild() {
+  const mkt    = buildMarketMap();
+  const psb    = 1 + getPSB() / 100;
+  const lvl    = oppMLevel;
+  const search = oppMSearch.toLowerCase();
+
+  // Build a quick-lookup of current deficits (resource kind → row)
+  const defMap = {};
+  for (const r of defRows) defMap[r.kind] = r;
+
+  const rows = [];
+  for (const bld of BLDS) {
+    if (bld.c !== 'production') continue;
+    for (const pk of bld.o) {
+      const prod = PROD[pk];
+      if (!prod) continue;
+      const ab      = bld.hasAbundance ? 0.6 : 1.0;
+      const pphEff  = prod.pph * lvl * psb * ab;
+      const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+      const revDay  = pphEff * 24 * (mkt[+pk] || 0);
+      const wagDay  = bld.w * lvl * 24 * (1 + getAO() / 100);
+      const profDay = revDay - pphEff * 24 * matCPU - wagDay;
+      const owned         = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
+      const missingInputs = prod.i.some(inp => !mkt[+inp.k]);
+      // Build cost = 1 × base cost (same formula as upgrading from L1 → L2)
+      const buildCost = getUpgradeCost(bld, 1, mkt);
+      const payback   = buildCost > 0 && profDay > 0 ? Math.ceil(buildCost / profDay) : null;
+      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, profDay, owned,
+                  missingInputs, hasAbundance: bld.hasAbundance,
+                  def: defMap[pk] || null, buildCost, payback,
+                  hasMat: hasBuildMaterials(bld) });
+    }
+  }
+
+  let filtered = rows;
+  if (oppMOwned) filtered = filtered.filter(r => r.owned);
+  if (search)    filtered = filtered.filter(r =>
+    r.bldName.toLowerCase().includes(search) || r.prodName.toLowerCase().includes(search));
+  filtered.sort((a, b) => b.profDay - a.profDay);
+
+  document.getElementById('oppMBuildTbody').innerHTML = filtered.map(r => {
+    const pc   = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
+    const warn = r.missingInputs
+      ? ' <span style="color:var(--amber)" title="One or more input prices are $0">⚠</span>' : '';
+    const abund = r.hasAbundance
+      ? ' <span style="color:var(--amber);font-size:10px" title="Calculated at 60% mean abundance">60% abund.</span>' : '';
+    const owned = r.owned
+      ? ' <span class="badge" style="color:var(--green);border-color:var(--green)">owned</span>' : '';
+
+    const defCell = r.def
+      ? `<span style="color:var(--amber);font-size:12px">&#10003; ${esc(r.def.name)}&nbsp;&mdash;&nbsp;saves ${fmtSC(r.def.buyCost)}/day</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    const costCell = r.buildCost > 0
+      ? `${fmtSC(r.buildCost)}${r.hasMat ? '' : '<span style="color:var(--muted);font-size:10px"> CU only</span>'}`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    const payCell = r.payback != null
+      ? `<span style="color:${r.payback<=30?'var(--green)':r.payback<=90?'var(--amber)':'var(--red)'}">${r.payback}d</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+
+    return `<tr>
+      <td>${esc(r.bldName)}${owned}</td>
+      <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
+      <td class="num" style="color:${pc};font-weight:600">${r.profDay>=0?'+':''}${fmtSC(r.profDay)}/day${warn}${abund}</td>
+      <td>${defCell}</td>
+      <td class="num" style="color:var(--muted);font-size:12px">${costCell}</td>
+      <td class="num">${payCell}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No results</td></tr>`;
+}
+
+function renderOppUpgrade() {
+  const mkt = buildMarketMap();
+  const tbody = document.getElementById('oppMUpgTbody');
+  const note  = document.getElementById('oppMUpgNote');
+
+  if (!playerBuildings.length) {
+    note.textContent = '';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No buildings added yet — import your buildings first.</td></tr>`;
+    return;
+  }
+
+  const rows = [];
+  let anyMats = false;
+  for (const e of playerBuildings) {
+    const bld = BLDS.find(b => b.k === e.bk);
+    if (!bld || bld.c !== 'production') continue;
+    const lv = e.lvl || 1;
+    if (lv >= (bld.maxLvl || 15)) continue;
+    const ab   = getAbundance(e);
+    const curr = calcBuildingProfit(e.bk, e.pk, lv,     1, ab);
+    const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1, ab);
+    if (!curr || !next) continue;
+    const gain    = next.profitDay - curr.profitDay;
+    const hasMat  = hasBuildMaterials(bld);
+    if (hasMat) anyMats = true;
+    const upgCost = getUpgradeCost(bld, lv, mkt);
+    const payback = upgCost > 0 && gain > 0 ? Math.ceil(upgCost / gain) : null;
+    rows.push({ bldName: bld.n, pk: e.pk, lv, gain, upgCost, hasMat, payback, qty: e.qty || 1 });
+  }
+
+  note.textContent = anyMats ? '' :
+    'Upgrade costs show Construction Units only — full material prices load from the game API once you sync.';
+
+  rows.sort((a, b) => {
+    if (a.payback != null && b.payback != null) return a.payback - b.payback;
+    if (a.payback != null) return -1;
+    if (b.payback != null) return  1;
+    return b.gain - a.gain;
+  });
+
+  tbody.innerHTML = rows.map(r => {
+    const gc = r.gain >= 0 ? 'var(--green)' : 'var(--red)';
+    const qty = r.qty > 1
+      ? ` <span style="color:var(--muted);font-size:10px">×${r.qty} = ${fmtSC(r.gain*r.qty)}/day</span>` : '';
+    const costCell = r.upgCost > 0
+      ? `${fmtSC(r.upgCost)}${r.hasMat?'':'<span style="color:var(--muted);font-size:10px"> CU only</span>'}`
+      : `<span style="color:var(--muted)">—</span>`;
+    const payCell = r.payback != null
+      ? `<span style="color:${r.payback<=30?'var(--green)':r.payback<=90?'var(--amber)':'var(--red)'}">
+           ${r.payback}d
+         </span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    return `<tr>
+      <td>${esc(r.bldName)}</td>
+      <td><div class="res">${iconHtml(r.pk)}${esc(PROD[r.pk]?.n||'')}</div></td>
+      <td class="num" style="color:var(--muted)">Lvl ${r.lv} &rarr; ${r.lv+1}</td>
+      <td class="num" style="color:${gc};font-weight:600">${r.gain>=0?'+':''}${fmtSC(r.gain)}/day${qty}</td>
+      <td class="num" style="color:var(--muted);font-size:12px">${costCell}</td>
+      <td class="num">${payCell}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">All owned buildings are at max level.</td></tr>`;
+}
+
+// ── Opportunities modal events ────────────────────────────────────────────
+document.getElementById('oppModalBtn').addEventListener('click', openOppModal);
+document.getElementById('oppModalClose').addEventListener('click', closeOppModal);
+document.getElementById('oppModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('oppModal')) closeOppModal();
+});
+document.querySelectorAll('[data-opp-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    oppMTab = btn.dataset.oppTab;
+    document.querySelectorAll('.opp-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('opp-pane-build').style.display   = oppMTab === 'build'   ? '' : 'none';
+    document.getElementById('opp-pane-upgrade').style.display = oppMTab === 'upgrade' ? '' : 'none';
+    renderOppModal();
+  });
+});
+document.getElementById('oppMLevel').addEventListener('input', e => {
+  oppMLevel = Math.max(1, parseInt(e.target.value) || 1);
+  renderOppBuild();
+});
+document.getElementById('oppMSearch').addEventListener('input', e => {
+  oppMSearch = e.target.value;
+  renderOppBuild();
+});
+document.getElementById('oppMOwnedBtn').addEventListener('click', () => {
+  oppMOwned = !oppMOwned;
+  document.getElementById('oppMOwnedBtn').classList.toggle('active', oppMOwned);
+  renderOppBuild();
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
    RENDER — BUILDING PROFITABILITY
 ───────────────────────────────────────────────────────────────────────────── */
 function renderOpportunities() {
+  // This function now only renders the legacy inline card (kept for internal use).
+  // The primary UI is the Opportunities modal — see renderOppBuild / renderOppUpgrade.
   const card = document.getElementById('oppCard');
-  if (!ticker.length) { card.style.display = 'none'; return; }
+  card.style.display = 'none'; return; // suppress the inline card — use the modal instead
+  if (!ticker.length) { card.style.display = 'none'; return; } // eslint-disable-line
 
   const mkt    = buildMarketMap();
   const psb    = 1 + getPSB() / 100;
@@ -1155,10 +1374,7 @@ function updateSummary() {
   }, 0);
   const profitColor = totalProfit >= 0 ? 'var(--green)' : 'var(--red)';
 
-  // Best upgrade: sort by payback period (upgrade cost ÷ daily gain) so higher levels
-  // don't dominate just because they have the same absolute gain but cost far more.
-  // Upgrade cost: costUnits × N Construction Units for Lvl N → N+1
-  const cuPrice = buildMarketMap()[111] || 0;
+  // Best upgrade: sort by payback period (upgrade cost ÷ daily gain).
   const best = playerBuildings
     .map(e => {
       const bld2 = BLDS.find(b => b.k === e.bk);
@@ -1169,11 +1385,11 @@ function updateSummary() {
       const curr = calcBuildingProfit(e.bk, e.pk, lv,     1, ab);
       const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1, ab);
       if (!curr || !next) return null;
-      const gain = next.profitDay - curr.profitDay;
-      // costUnits × lv = CU needed; × cuPrice = monetary cost
+      const gain    = next.profitDay - curr.profitDay;
+      const mktNow  = buildMarketMap();
+      const upgCost = getUpgradeCost(bld2, lv, mktNow) || null;
       const upgCU   = bld2.costUnits != null ? bld2.costUnits * lv : null;
-      const upgCost = upgCU != null && cuPrice > 0 ? upgCU * cuPrice : null;
-      const payback = upgCost != null && gain > 0 ? upgCost / gain : null;
+      const payback = upgCost && gain > 0 ? upgCost / gain : null;
       return { gain, upgCU, upgCost, payback, bldName: bld2.n, prodName: PROD[e.pk]?.n || '', lv, qty: e.qty };
     })
     .filter(Boolean)
@@ -1243,6 +1459,10 @@ function updateSummary() {
    BUILDING CONSTANTS  (wages, maxLvl from live API, cached 6h)
 ───────────────────────────────────────────────────────────────────────────── */
 function applyBuildingConstants(data) {
+  // Log the first building object so we can see every field the API returns.
+  // Remove this once we know the correct material field names.
+  if (data.length) console.log('[SC Advisor] buildings API sample entry:', JSON.stringify(data[0], null, 2));
+
   for (const b of data) {
     // API may return db_letter (snake_case) or dbLetter (camelCase)
     const letter = b.db_letter != null ? String(b.db_letter)
@@ -1256,6 +1476,14 @@ function applyBuildingConstants(data) {
     // costUnits = number of Construction Units (kind 111) required per level upgrade
     const cu = b.costUnits ?? b.cost_units ?? null;
     if (cu != null && +cu > 0) bld.costUnits = +cu;
+    // buildMats = construction material list (base cost for L1 build and each upgrade level)
+    // Field name varies by API version — try all known variants
+    const mats = b.building_materials ?? b.buildingMaterials ?? b.build_materials ?? b.buildMaterials ?? b.materials ?? null;
+    if (Array.isArray(mats) && mats.length) {
+      bld.buildMats = mats
+        .map(m => ({ k: +(m.resource ?? m.kind ?? m.k ?? 0), a: +(m.amount ?? m.qty ?? m.a ?? 0) }))
+        .filter(m => m.k > 0 && m.a > 0);
+    }
   }
 }
 
@@ -1274,6 +1502,26 @@ async function loadBuildingConstants(force = false) {
     }
   } catch (e) {
     console.warn('Building constants load failed:', e.message);
+  }
+
+  // Probe: check whether the encyclopedia has a buildings section with construction costs.
+  // Try a few likely URL patterns — log whatever comes back so we can see the structure.
+  const probePaths = [
+    '/api/v4/en/0/encyclopedia/buildings/',
+    '/api/v3/encyclopedia/buildings/',
+    '/api/v2/encyclopedia/buildings/',
+  ];
+  for (const path of probePaths) {
+    try {
+      const r = await fetch(`${PROXY_URL}${path}`);
+      if (r.ok) {
+        const d = await r.json();
+        console.log(`[SC Advisor] encyclopedia buildings probe HIT — ${path}`, JSON.stringify(Array.isArray(d) ? d[0] : d).slice(0, 800));
+        break;
+      } else {
+        console.log(`[SC Advisor] encyclopedia buildings probe ${r.status} — ${path}`);
+      }
+    } catch { /* skip */ }
   }
 }
 
