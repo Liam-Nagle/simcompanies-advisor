@@ -17,6 +17,7 @@
     <div class="opp-tab-bar">
       <button class="opp-tab active" data-opp-tab="build">&#128200; Best to Build</button>
       <button class="opp-tab"        data-opp-tab="upgrade">&#8679; Best to Upgrade</button>
+      <button class="opp-tab"        data-opp-tab="retail">&#127978; Retail</button>
     </div>
 
     <!-- Best to Build pane -->
@@ -33,6 +34,7 @@
         <table>
           <thead>
             <tr>
+              <th style="width:20px"></th>
               <th>Building</th>
               <th>Product</th>
               <th class="num">Profit/day</th>
@@ -64,6 +66,42 @@
           <tbody id="oppMUpgTbody"></tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Retail pane -->
+    <div id="opp-pane-retail" class="opp-pane" style="display:none">
+      <div class="opp-controls">
+        <label class="ao-label">Realm
+          <select id="oppMRealm" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:12px">
+            <option value="r1">Magnates (R1)</option>
+            <option value="r2">Entrepreneurs (R2)</option>
+          </select>
+        </label>
+        <span id="oppRetailMeta" style="color:var(--muted);font-size:12px"></span>
+        <span id="oppRetailStatus" style="color:var(--muted);font-size:12px;margin-left:auto"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:20px"></th>
+              <th>Building</th>
+              <th>Best Product to Sell</th>
+              <th class="num">Units/Hr/Level</th>
+              <th class="num">Gross Rev/Day</th>
+              <th class="num">Buy at Market</th>
+              <th class="num">Self-Supply</th>
+              <th class="num">Net/Day (current)</th>
+            </tr>
+          </thead>
+          <tbody id="oppMRetailTbody"></tbody>
+        </table>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">
+        Sales rates from <a href="https://cooperinc.xyz/retail" target="_blank" style="color:var(--blue)">cooperinc.xyz</a> &middot;
+        Net = gross revenue &minus; wages &minus; cost of goods &middot;
+        If you produce the good yourself, production cost is used; otherwise market buy price is assumed
+      </p>
     </div>
   </div>
 </div>

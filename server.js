@@ -17,7 +17,9 @@ app.use((req, res, next) => {
 
 // ── Health check ──────────────────────────────────────────────────────────────
 // Lightweight wake-up endpoint — no proxying, just confirms the server is alive.
-app.get('/ping', (req, res) => res.json({ ok: true }));
+// Using /healthz instead of /ping as some platforms intercept /ping themselves.
+app.get('/healthz', (req, res) => res.json({ ok: true }));
+app.get('/ping',    (req, res) => res.json({ ok: true })); // keep for compatibility
 
 // ── Proxy ─────────────────────────────────────────────────────────────────────
 // Forward every /api/* path to simcompanies.com, injecting the caller's

@@ -157,44 +157,45 @@ const PROD = {
  145: {n:'Recipes',                pph:3.81,    i:[]},
 };
 
-// maxLvl sourced from /api/v2/constants/buildings/ levelImages array lengths
+// maxLvl + wages sourced from /api/v2/constants/buildings/ (overrides at runtime)
+// costUnits sourced from cooperinc.xyz construction tool — drives getUpgradeCost()
 const BLDS = [
-  {k:'E', n:'Power Plant',                   w:414,   c:'production', maxLvl:15, o:[1]},
-  {k:'W', n:'Water Reservoir',               w:345,   c:'production', maxLvl:15, o:[2]},
-  {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:15, o:[3,4,5,6,40,66,72,106,118,120,136]},
-  {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:6,  o:[9,46,115,116,117]},
-  {k:'M', n:'Mine',                          w:276,   c:'production', maxLvl:15, o:[14,15,68,42],    hasAbundance:true},
-  {k:'O', n:'Oil Rig',                       w:517.5, c:'production', maxLvl:15, o:[10,74],           hasAbundance:true},
-  {k:'Q', n:'Quarry',                        w:276,   c:'production', maxLvl:15, o:[44,104,105],      hasAbundance:true},
-  {k:'S', n:'Shipping Depot',                w:310.5, c:'production', maxLvl:6,  o:[13]},
-  {k:'Y', n:'Factory',                       w:414,   c:'production', maxLvl:15, o:[16,17,18,69,43,45,76,67]},
-  {k:'R', n:'Refinery',                      w:483,   c:'production', maxLvl:6,  o:[11,12,19,75,83]},
-  {k:'L', n:'Electronics Factory',           w:379.5, c:'production', maxLvl:15, o:[20,21,22,23,24,25,26,27,28,114,47,79]},
-  {k:'T', n:'Fashion Factory',               w:138,   c:'production', maxLvl:6,  o:[41,60,61,62,63,64,65,70,71]},
-  {k:'1', n:'Car Factory',                   w:448.5, c:'production', maxLvl:5,  o:[49,50,51,53,54,55,56,57,112]},
-  {k:'D', n:'Propulsion Factory',            w:621,   c:'production', maxLvl:15, o:[48,52,85,86,88,89]},
-  {k:'7', n:'Aerospace Factory',             w:586.5, c:'production', maxLvl:15, o:[77,78,84,87,90,92,93]},
-  {k:'8', n:'Aerospace Electronics',         w:724.5, c:'production', maxLvl:15, o:[80,81,82,98,99]},
-  {k:'9', n:'Vertical Integration Facility', w:759,   c:'production', maxLvl:15, o:[91,94]},
-  {k:'0', n:'Hangar',                        w:759,   c:'production', maxLvl:15, o:[95,96,97]},
-  {k:'o', n:'Concrete Plant',                w:379.5, c:'production', maxLvl:15, o:[101,102,103]},
-  {k:'x', n:'Construction Factory',          w:483,   c:'production', maxLvl:15, o:[107,108,109,110]},
-  {k:'g', n:'General Contractor',            w:345,   c:'production', maxLvl:15, o:[111]},
-  {k:'e', n:'Slaughterhouse',                w:414,   c:'production', maxLvl:15, o:[7,8]},
-  {k:'i', n:'Mill',                          w:379.5, c:'production', maxLvl:15, o:[119,133,139]},
-  {k:'j', n:'Bakery',                        w:448.5, c:'production', maxLvl:15, o:[137,121,123]},
-  {k:'m', n:'Catering',                      w:655.5, c:'production', maxLvl:15, o:[138,129,130,131,142,132,143]},
-  {k:'k', n:'Food Processing Plant',         w:379.5, c:'production', maxLvl:15, o:[141,128,134,122,135,127,140]},
-  {k:'6', n:'Beverage Factory',              w:241.5, c:'production', maxLvl:15, o:[73,124,125,126]},
-  {k:'p', n:'Plant Research Center',         w:448.5, c:'research',   maxLvl:1,  o:[29]},
-  {k:'h', n:'Physics Laboratory',            w:586.5, c:'research',   maxLvl:3,  o:[30,31,32]},
-  {k:'b', n:'Breeding Laboratory',           w:414,   c:'research',   maxLvl:3,  o:[33]},
-  {k:'c', n:'Chemistry Laboratory',          w:414,   c:'research',   maxLvl:3,  o:[34,113]},
-  {k:'a', n:'Automotive R&D',                w:552,   c:'research',   maxLvl:3,  o:[58]},
-  {k:'f', n:'Fashion & Design',              w:448.5, c:'research',   maxLvl:3,  o:[59]},
-  {k:'s', n:'Software R&D',                  w:448.5, c:'research',   maxLvl:3,  o:[35]},
-  {k:'l', n:'Launch Pad',                    w:724.5, c:'research',   maxLvl:3,  o:[100]},
-  {k:'q', n:'Kitchen',                       w:517.5, c:'research',   maxLvl:3,  o:[145]},
+  {k:'E', n:'Power Plant',                   w:414,   c:'production', maxLvl:15, costUnits:15, o:[1]},
+  {k:'W', n:'Water Reservoir',               w:345,   c:'production', maxLvl:15, costUnits:6,  o:[2]},
+  {k:'P', n:'Farm',                          w:103.5, c:'production', maxLvl:15, costUnits:2,  o:[3,4,5,6,40,66,72,106,118,120,136]},
+  {k:'F', n:'Ranch',                         w:138,   c:'production', maxLvl:6,  costUnits:3,  o:[9,46,115,116,117]},
+  {k:'M', n:'Mine',                          w:276,   c:'production', maxLvl:15, costUnits:7,  o:[14,15,68,42],    hasAbundance:true},
+  {k:'O', n:'Oil Rig',                       w:517.5, c:'production', maxLvl:15, costUnits:20, o:[10,74],           hasAbundance:true},
+  {k:'Q', n:'Quarry',                        w:276,   c:'production', maxLvl:15, costUnits:7,  o:[44,104,105],      hasAbundance:true},
+  {k:'S', n:'Shipping Depot',                w:310.5, c:'production', maxLvl:6,  costUnits:15, o:[13]},
+  {k:'Y', n:'Factory',                       w:414,   c:'production', maxLvl:15, costUnits:14, o:[16,17,18,69,43,45,76,67]},
+  {k:'R', n:'Refinery',                      w:483,   c:'production', maxLvl:6,  costUnits:20, o:[11,12,19,75,83]},
+  {k:'L', n:'Electronics Factory',           w:379.5, c:'production', maxLvl:15, costUnits:24, o:[20,21,22,23,24,25,26,27,28,114,47,79]},
+  {k:'T', n:'Fashion Factory',               w:138,   c:'production', maxLvl:6,  costUnits:4,  o:[41,60,61,62,63,64,65,70,71]},
+  {k:'1', n:'Car Factory',                   w:448.5, c:'production', maxLvl:5,  costUnits:27, o:[49,50,51,53,54,55,56,57,112]},
+  {k:'D', n:'Propulsion Factory',            w:621,   c:'production', maxLvl:15, costUnits:30, o:[48,52,85,86,88,89]},
+  {k:'7', n:'Aerospace Factory',             w:586.5, c:'production', maxLvl:15, costUnits:31, o:[77,78,84,87,90,92,93]},
+  {k:'8', n:'Aerospace Electronics',         w:724.5, c:'production', maxLvl:15, costUnits:41, o:[80,81,82,98,99]},
+  {k:'9', n:'Vertical Integration Facility', w:759,   c:'production', maxLvl:15, costUnits:33, o:[91,94]},
+  {k:'0', n:'Hangar',                        w:759,   c:'production', maxLvl:15, costUnits:29, o:[95,96,97]},
+  {k:'o', n:'Concrete Plant',                w:379.5, c:'production', maxLvl:15, costUnits:17, o:[101,102,103]},
+  {k:'x', n:'Construction Factory',          w:483,   c:'production', maxLvl:15, costUnits:21, o:[107,108,109,110]},
+  {k:'g', n:'General Contractor',            w:345,   c:'production', maxLvl:15, costUnits:14, o:[111]},
+  {k:'e', n:'Slaughterhouse',                w:414,   c:'production', maxLvl:15, costUnits:6,  o:[7,8]},
+  {k:'i', n:'Mill',                          w:379.5, c:'production', maxLvl:15, costUnits:8,  o:[119,133,139]},
+  {k:'j', n:'Bakery',                        w:448.5, c:'production', maxLvl:15, costUnits:11, o:[137,121,123]},
+  {k:'m', n:'Catering',                      w:655.5, c:'production', maxLvl:15, costUnits:30, o:[138,129,130,131,142,132,143]},
+  {k:'k', n:'Food Processing Plant',         w:379.5, c:'production', maxLvl:15, costUnits:25, o:[141,128,134,122,135,127,140]},
+  {k:'6', n:'Beverage Factory',              w:241.5, c:'production', maxLvl:15, costUnits:4,  o:[73,124,125,126]},
+  {k:'p', n:'Plant Research Center',         w:448.5, c:'research',   maxLvl:1,  costUnits:30, o:[29]},
+  {k:'h', n:'Physics Laboratory',            w:586.5, c:'research',   maxLvl:3,  costUnits:48, o:[30,31,32]},
+  {k:'b', n:'Breeding Laboratory',           w:414,   c:'research',   maxLvl:3,  costUnits:28, o:[33]},
+  {k:'c', n:'Chemistry Laboratory',          w:414,   c:'research',   maxLvl:3,  costUnits:28, o:[34,113]},
+  {k:'a', n:'Automotive R&D',                w:552,   c:'research',   maxLvl:3,  costUnits:40, o:[58]},
+  {k:'f', n:'Fashion & Design',              w:448.5, c:'research',   maxLvl:3,  costUnits:21, o:[59]},
+  {k:'s', n:'Software R&D',                  w:448.5, c:'research',   maxLvl:3,  costUnits:19, o:[35]},
+  {k:'l', n:'Launch Pad',                    w:724.5, c:'research',   maxLvl:3,  costUnits:36, o:[100]},
+  {k:'q', n:'Kitchen',                       w:517.5, c:'research',   maxLvl:3,  costUnits:24, o:[145]},
   // Retail/sale buildings — rpph is estimated units sold per hour per level
   {k:'G', n:'Grocery Store',     w:138,   c:'retail', maxLvl:3, rpph:100, o:[121,117,122,9,120,134,124,125,126,119,3,4,5,6,72]},
   {k:'N', n:'Restaurant',        w:207,   c:'retail', maxLvl:3, rpph:10,  o:[129,127,130,131,132,142,143]},
@@ -524,10 +525,15 @@ function renderBuildingList() {
     const abundance = getAbundance(e);
     let rateStr;
     if (isRetail) {
-      rateStr = `<input type="number" class="qty-inp" value="${Math.round(e.targetRate ?? (bld.rpph || 0) * lvl * 24)}" min="0"
-               data-rate-idx="${i}" title="Units sold per day per building — edit to match your in-game rate"
-               style="width:70px;background:var(--bg3);border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:2px 5px;font-size:12px;text-align:right">
-               <span style="font-size:10px;color:var(--muted)">/day</span>`;
+      const rp = calcRetailProfit(e.bk, e.pk, lvl, 1); // per-building rate
+      if (rp) {
+        rateStr = `<span style="color:var(--muted)">${fmtN(rp.unitsDay, 1)}/day</span>
+                   <div style="font-size:10px;color:var(--muted);margin-top:1px">
+                     ${fmtSC(rp.price)}/unit sell · ${fmtSC(rp.cogsCpu)}/unit cost · sat ${rp.sat.toFixed(2)}
+                   </div>`;
+      } else {
+        rateStr = `<span style="color:var(--muted);font-size:11px">— open Opportunities → Retail to load</span>`;
+      }
     } else {
       const psb = 1 + getPSB() / 100;
       const ppd = prod ? prod.pph * lvl * e.qty * 24 * psb * abundance : 0;
@@ -541,7 +547,16 @@ function renderBuildingList() {
       rateStr = abundInput + `<span style="color:var(--muted)">${fmtN(ppd)}/day</span>`;
     }
     const profitCell = (() => {
-      if (isRetail) return `<span style="color:var(--muted)">—</span>`;
+      if (isRetail) {
+        const rp = calcRetailProfit(e.bk, e.pk, lvl, e.qty);
+        if (!rp) return `<span style="color:var(--muted);font-size:11px">— open Opportunities → Retail</span>`;
+        const c    = rp.profDay >= 0 ? 'var(--green)' : 'var(--red)';
+        const cogs = rp.selfSupplied
+          ? `<span style="color:var(--green);font-size:10px" title="Cost of goods from your own production (${fmtSC(rp.cogsCpu)}/unit)">&#10003; own stock</span>`
+          : `<span style="color:var(--amber);font-size:10px" title="Cost of goods at market price (${fmtSC(rp.cogsCpu)}/unit) — build a producer to reduce costs">buy at market</span>`;
+        return `<div><span style="color:${c};font-weight:600">${rp.profDay>=0?'+':''}${fmtSC(rp.profDay)}/day</span>
+                <div style="margin-top:2px">${cogs}</div></div>`;
+      }
       const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty, abundance);
       if (!p) return `<span style="color:var(--muted)">—</span>`;
       const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
@@ -612,23 +627,81 @@ function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
 
 /* ─────────────────────────────────────────────────────────────────────────────
    UPGRADE / BUILD COST HELPERS
+
+   Formula confirmed via cooperinc.xyz construction tool (cross-checked Farm
+   and Ranch). All buildings share the same material multipliers keyed off
+   their Construction Unit count (costUnits from the buildings API):
+     Reinforced Concrete (101) = 4  × costUnits
+     Bricks              (102) = 55 × costUnits
+     Planks              (108) = 16 × costUnits
+     Construction Units  (111) = 1  × costUnits
+   Upgrade from level N → N+1 costs N × the base amounts above.
 ───────────────────────────────────────────────────────────────────────────── */
-// True if the buildings API has given us construction material data for this building.
 function hasBuildMaterials(bld) {
-  return Array.isArray(bld.buildMats) && bld.buildMats.length > 0;
+  return (bld.costUnits || 0) > 0;
+}
+
+// Retail profit using live cooperinc.xyz demand data.
+// Returns null if retail data hasn't loaded yet.
+// Cost of goods: uses the player's own production cost per unit if they produce the
+// product in their buildings, otherwise falls back to buying at market price.
+function calcRetailProfit(bk, pk, lvl, qty) {
+  if (!_retailData) return null;
+  const coopId = RETAIL_BLD_MAP[bk];
+  if (!coopId) return null;
+  const phase   = _retailData.economyPhase;
+  const weather = _retailData.weatherMultiplier || 1;
+  const bldInfo = _retailData.buildingData?.[coopId];
+  const adj     = bldInfo?.retailAdjustment ?? 1;
+  const pd      = _retailData.productPhaseData?.[pk]?.['0']?.[phase];
+  if (!pd) return null;
+  const sat     = _retailData.marketData?.[pk]?.['0']?.saturation || 1;
+  const unitsHr = pd.W * sat * weather * RETAIL_FORMULA_K * adj;
+  const mkt     = buildMarketMap();
+  const price   = mkt[+pk] || 0;
+  const l = lvl || 1, q = qty || 1;
+  const unitsDay = unitsHr * l * q * 24;
+  const revDay   = unitsDay * price;
+  const wagDay   = (BLDS.find(b => b.k === bk)?.w || 0) * l * q * 24 * (1 + getAO() / 100);
+
+  // Cost of goods: if the player produces this resource themselves, use their
+  // production cost. Otherwise they must buy it at market price.
+  const cpuOwn  = calcCostPerUnit(+pk, mkt);  // null if player doesn't produce it
+  const cogsCpu = cpuOwn !== null ? cpuOwn : price;
+  const cogsDay = unitsDay * cogsCpu;
+  const selfSupplied = cpuOwn !== null;
+
+  const profDay = revDay - wagDay - cogsDay;
+
+  return { unitsHr, unitsDay, revDay, wagDay, cogsDay, cogsCpu, profDay, price, sat, selfSupplied };
+}
+
+// Theoretical production cost per unit for resource kindId at a hypothetical
+// level-1 building — used for the "what if you self-supplied?" column even when
+// the player doesn't own the relevant building.
+function theoreticalCostPerUnit(kindId, mkt) {
+  const prod = PROD[+kindId];
+  if (!prod || prod.pph <= 0) return null;
+  const bld = BLDS.find(b => b.o.includes(+kindId) && b.c === 'production');
+  if (!bld) return null;
+  const ab     = bld.hasAbundance ? 0.6 : 1.0;
+  const pphEff = prod.pph * ab;
+  if (pphEff <= 0) return null;
+  const wageCPU = bld.w / pphEff;
+  const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+  return wageCPU + matCPU;
 }
 
 // Cost to upgrade a building from `fromLvl` to `fromLvl + 1`.
-// Formula: fromLvl × (CU_count × CU_price  +  Σ material_amount × material_price)
-// Falls back to CU-only when buildMats data is not available.
 function getUpgradeCost(bld, fromLvl, mkt) {
-  const cuP = mkt[111] || 0;
-  const cuN = bld.costUnits || 0;
-  let matCost = 0;
-  if (hasBuildMaterials(bld)) {
-    for (const m of bld.buildMats) matCost += m.a * (mkt[m.k] || 0);
-  }
-  return fromLvl * (cuN * cuP + matCost);
+  const cu = bld.costUnits || 0;
+  if (!cu || fromLvl < 1) return 0;
+  const baseCost =
+    4  * cu * (mkt[101] || 0) +   // Reinforced Concrete
+    55 * cu * (mkt[102] || 0) +   // Bricks
+    16 * cu * (mkt[108] || 0) +   // Planks
+         cu * (mkt[111] || 0);    // Construction Units
+  return fromLvl * baseCost;
 }
 
 function recalculate() {
@@ -1046,8 +1119,12 @@ function closeOppModal() {
   document.getElementById('oppModal').style.display = 'none';
 }
 function renderOppModal() {
-  if (oppMTab === 'build') renderOppBuild();
-  else                     renderOppUpgrade();
+  if (oppMTab === 'build')   renderOppBuild();
+  else if (oppMTab === 'upgrade') renderOppUpgrade();
+  else if (oppMTab === 'retail') {
+    if (!_retailData) fetchRetailData(_retailRealm);
+    else              renderOppRetail();
+  }
 }
 
 function renderOppBuild() {
@@ -1079,8 +1156,7 @@ function renderOppBuild() {
       const payback   = buildCost > 0 && profDay > 0 ? Math.ceil(buildCost / profDay) : null;
       rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, profDay, owned,
                   missingInputs, hasAbundance: bld.hasAbundance,
-                  def: defMap[pk] || null, buildCost, payback,
-                  hasMat: hasBuildMaterials(bld) });
+                  def: defMap[pk] || null, buildCost, payback });
     }
   }
 
@@ -1090,7 +1166,7 @@ function renderOppBuild() {
     r.bldName.toLowerCase().includes(search) || r.prodName.toLowerCase().includes(search));
   filtered.sort((a, b) => b.profDay - a.profDay);
 
-  document.getElementById('oppMBuildTbody').innerHTML = filtered.map(r => {
+  document.getElementById('oppMBuildTbody').innerHTML = filtered.map((r, i) => {
     const pc   = r.profDay >= 0 ? 'var(--green)' : 'var(--red)';
     const warn = r.missingInputs
       ? ' <span style="color:var(--amber)" title="One or more input prices are $0">⚠</span>' : '';
@@ -1104,22 +1180,25 @@ function renderOppBuild() {
       : `<span style="color:var(--muted)">—</span>`;
 
     const costCell = r.buildCost > 0
-      ? `${fmtSC(r.buildCost)}${r.hasMat ? '' : '<span style="color:var(--muted);font-size:10px"> CU only</span>'}`
+      ? fmtSC(r.buildCost)
       : `<span style="color:var(--muted)">—</span>`;
 
     const payCell = r.payback != null
       ? `<span style="color:${r.payback<=30?'var(--green)':r.payback<=90?'var(--amber)':'var(--red)'}">${r.payback}d</span>`
       : `<span style="color:var(--muted)">—</span>`;
 
-    return `<tr>
+    return `
+    <tr class="opp-row" data-bk="${r.bk}" data-pk="${r.pk}" style="cursor:pointer">
+      <td><span class="tog" id="omtog${i}">&#9658;</span></td>
       <td>${esc(r.bldName)}${owned}</td>
       <td><div class="res">${iconHtml(r.pk)}${esc(r.prodName)}</div></td>
       <td class="num" style="color:${pc};font-weight:600">${r.profDay>=0?'+':''}${fmtSC(r.profDay)}/day${warn}${abund}</td>
       <td>${defCell}</td>
       <td class="num" style="color:var(--muted);font-size:12px">${costCell}</td>
       <td class="num">${payCell}</td>
-    </tr>`;
-  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">No results</td></tr>`;
+    </tr>
+    <tr class="detail-tr hide" id="omdet${i}"><td colspan="7"></td></tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No results</td></tr>`;
 }
 
 function renderOppUpgrade() {
@@ -1134,7 +1213,6 @@ function renderOppUpgrade() {
   }
 
   const rows = [];
-  let anyMats = false;
   for (const e of playerBuildings) {
     const bld = BLDS.find(b => b.k === e.bk);
     if (!bld || bld.c !== 'production') continue;
@@ -1145,15 +1223,12 @@ function renderOppUpgrade() {
     const next = calcBuildingProfit(e.bk, e.pk, lv + 1, 1, ab);
     if (!curr || !next) continue;
     const gain    = next.profitDay - curr.profitDay;
-    const hasMat  = hasBuildMaterials(bld);
-    if (hasMat) anyMats = true;
     const upgCost = getUpgradeCost(bld, lv, mkt);
     const payback = upgCost > 0 && gain > 0 ? Math.ceil(upgCost / gain) : null;
-    rows.push({ bldName: bld.n, pk: e.pk, lv, gain, upgCost, hasMat, payback, qty: e.qty || 1 });
+    rows.push({ bldName: bld.n, pk: e.pk, lv, gain, upgCost, payback, qty: e.qty || 1 });
   }
 
-  note.textContent = anyMats ? '' :
-    'Upgrade costs show Construction Units only — full material prices load from the game API once you sync.';
+  note.textContent = '';
 
   rows.sort((a, b) => {
     if (a.payback != null && b.payback != null) return a.payback - b.payback;
@@ -1167,7 +1242,7 @@ function renderOppUpgrade() {
     const qty = r.qty > 1
       ? ` <span style="color:var(--muted);font-size:10px">×${r.qty} = ${fmtSC(r.gain*r.qty)}/day</span>` : '';
     const costCell = r.upgCost > 0
-      ? `${fmtSC(r.upgCost)}${r.hasMat?'':'<span style="color:var(--muted);font-size:10px"> CU only</span>'}`
+      ? fmtSC(r.upgCost)
       : `<span style="color:var(--muted)">—</span>`;
     const payCell = r.payback != null
       ? `<span style="color:${r.payback<=30?'var(--green)':r.payback<=90?'var(--amber)':'var(--red)'}">
@@ -1185,11 +1260,182 @@ function renderOppUpgrade() {
   }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">All owned buildings are at max level.</td></tr>`;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   RETAIL TAB
+   Formula verified empirically (Farm/Sausages/Eggs data points):
+     units/hr/level = W × saturation × weatherMultiplier × 1.15
+   where W, saturation, weatherMultiplier come from cooperinc.xyz/api/initial-data
+   (public API, CORS: * — no proxy needed).
+───────────────────────────────────────────────────────────────────────────── */
+let _retailData   = null;   // cached API response
+let _retailRealm  = 'r1';   // 'r1' = Magnates, 'r2' = Entrepreneurs
+const RETAIL_FORMULA_K = 1.15;  // empirical constant from formula derivation
+
+// Map our BLDS retail letter keys → cooperinc buildingID keys (both from SimCompanies db_letter)
+const RETAIL_BLD_MAP = { G:'G', N:'N', C:'H', U:'C', V:'2', B:'B' };
+
+async function fetchRetailData(realm) {
+  document.getElementById('oppRetailStatus').textContent = 'Loading retail data…';
+  try {
+    const r = await fetch(`https://cooperinc.xyz/api/initial-data?realm=${realm}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    _retailData  = await r.json();
+    _retailRealm = realm;
+    document.getElementById('oppRetailStatus').textContent = '';
+    const phase = _retailData.economyPhase || '';
+    const w     = _retailData.weatherMultiplier ? ` · Weather ×${_retailData.weatherMultiplier.toFixed(2)}` : '';
+    document.getElementById('oppRetailMeta').textContent = `${phase} economy${w} · live data`;
+  } catch (e) {
+    document.getElementById('oppRetailStatus').textContent = `Failed to load: ${e.message}`;
+    _retailData = null;
+  }
+  renderOppRetail();
+  // Refresh the building list too — retail buildings now have live profit data
+  renderBuildingList();
+}
+
+function renderOppRetail() {
+  const tbody = document.getElementById('oppMRetailTbody');
+  if (!_retailData) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">
+      Retail data not loaded — select a realm above.</td></tr>`;
+    return;
+  }
+
+  const mkt      = buildMarketMap();
+  const phase    = _retailData.economyPhase;
+  const weather  = _retailData.weatherMultiplier || 1;
+  const buildings = _retailData.buildings  || {};
+  const phaseData = _retailData.productPhaseData || {};
+  const mktData   = _retailData.marketData || {};
+  const bldData   = _retailData.buildingData || {};
+
+  const rows = [];
+
+  for (const bld of BLDS) {
+    if (bld.c !== 'retail') continue;
+    const coopId = RETAIL_BLD_MAP[bld.k];
+    if (!coopId) continue;
+    const coopBld = buildings[coopId];
+    if (!coopBld) continue;
+
+    const wageDay  = (bldData[coopId]?.baseWage || bld.w) * 24;
+    const adj      = bldData[coopId]?.retailAdjustment ?? 1;
+    const products = coopBld.products || [];
+
+    // Find best product ranked by self-supply net profit (best realistic scenario)
+    let bestProduct = null, bestProfit = -Infinity;
+
+    for (const pid of products) {
+      const pd = phaseData[pid]?.['0']?.[phase];
+      if (!pd) continue;
+      const sat      = mktData[pid]?.['0']?.saturation || 1;
+      const unitsHr  = pd.W * sat * weather * RETAIL_FORMULA_K * adj;
+      const price    = mkt[pid] || 0;
+      if (!price) continue;
+      const unitsDay = unitsHr * 24;
+      const grossDay = unitsDay * price;
+
+      // Market scenario: buy goods at market price
+      const mktNetDay = grossDay - wageDay - unitsDay * price;
+
+      // Self-supply scenario: use own production cost if available,
+      // otherwise compute theoretical L1 cost so the column always shows
+      const cpuOwn     = calcCostPerUnit(+pid, mkt);
+      const cpuTheory  = theoreticalCostPerUnit(+pid, mkt);
+      const selfCpu    = cpuOwn ?? cpuTheory;
+      const selfNetDay = selfCpu != null ? grossDay - wageDay - unitsDay * selfCpu : null;
+      const selfSupplied = cpuOwn !== null;  // actually producing it right now
+
+      // Current net = what the player actually experiences today
+      const currentNetDay = selfSupplied && selfNetDay != null ? selfNetDay : mktNetDay;
+
+      // Rank by self-supply net (best achievable)
+      const rankVal = selfNetDay ?? mktNetDay;
+      if (rankVal > bestProfit) {
+        bestProfit = rankVal;
+        bestProduct = { pid, name: PROD[pid]?.n || `#${pid}`,
+                        unitsHr, unitsDay, grossDay, wageDay,
+                        mktNetDay, selfNetDay, selfCpu, selfSupplied, currentNetDay,
+                        sat, price };
+      }
+    }
+
+    rows.push({ bld, wageDay, bestProduct });
+  }
+
+  rows.sort((a, b) => {
+    const aVal = a.bestProduct ? (a.bestProduct.selfNetDay ?? a.bestProduct.mktNetDay) : -Infinity;
+    const bVal = b.bestProduct ? (b.bestProduct.selfNetDay ?? b.bestProduct.mktNetDay) : -Infinity;
+    return bVal - aVal;
+  });
+
+  const fmtNet = (val, isCurrent) => {
+    if (val == null) return `<span style="color:var(--muted)">—</span>`;
+    const c = val >= 0 ? 'var(--green)' : 'var(--red)';
+    const bold = isCurrent ? 'font-weight:700' : 'font-weight:400;opacity:0.75';
+    const marker = isCurrent ? ' &#9664;' : '';
+    return `<span style="color:${c};${bold}">${val>=0?'+':''}${fmtSC(val)}/day${marker}</span>`;
+  };
+
+  tbody.innerHTML = rows.map((r, i) => {
+    const bp = r.bestProduct;
+    if (!bp) return `<tr>
+      <td></td><td>${esc(r.bld.n)}</td>
+      <td colspan="6" style="color:var(--muted);font-size:12px">No live price data for products in this building</td>
+    </tr>`;
+
+    const supplyBadge = bp.selfSupplied
+      ? `<span style="color:var(--green);font-size:10px">&#10003; own production</span>`
+      : `<span style="color:var(--amber);font-size:10px">buying at market</span>`;
+
+    return `
+    <tr class="retail-row" style="cursor:default">
+      <td><span class="tog" id="mrtog${i}">&#9658;</span></td>
+      <td><strong>${esc(r.bld.n)}</strong></td>
+      <td><div class="res">${iconHtml(bp.pid)}${esc(bp.name)}
+        <span style="color:var(--muted);font-size:10px;margin-left:4px">sat ${bp.sat.toFixed(2)}</span>
+        <div style="margin-top:2px">${supplyBadge}</div>
+      </div></td>
+      <td class="num" style="color:var(--muted)">${fmtN(bp.unitsHr, 1)}/hr</td>
+      <td class="num" style="color:var(--muted)">${fmtSC(bp.grossDay)}/day</td>
+      <td class="num">${fmtNet(bp.mktNetDay,  !bp.selfSupplied)}</td>
+      <td class="num">${fmtNet(bp.selfNetDay,  bp.selfSupplied)}</td>
+      <td class="num">${fmtNet(bp.currentNetDay, true)}</td>
+    </tr>
+    <tr class="detail-tr hide" id="mrdet${i}"><td colspan="8"></td></tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No retail buildings found.</td></tr>`;
+}
+
 // ── Opportunities modal events ────────────────────────────────────────────
 document.getElementById('oppModalBtn').addEventListener('click', openOppModal);
 document.getElementById('oppModalClose').addEventListener('click', closeOppModal);
 document.getElementById('oppModal').addEventListener('click', e => {
   if (e.target === document.getElementById('oppModal')) closeOppModal();
+});
+
+// Expandable detail rows in the Build tab
+document.getElementById('oppMBuildTbody').addEventListener('click', e => {
+  const row = e.target.closest('.opp-row');
+  if (!row) return;
+  // Find the index from the toggle button id
+  const tog = row.querySelector('.tog');
+  if (!tog) return;
+  const idx = tog.id.replace('omtog', '');
+  const det = document.getElementById('omdet' + idx);
+  if (!det) return;
+  const bk  = row.dataset.bk;
+  const pk  = parseInt(row.dataset.pk);
+  const bld = BLDS.find(b => b.k === bk);
+  const ab  = bld?.hasAbundance ? 0.6 : 1.0;
+  if (!det.classList.contains('hide')) {
+    det.classList.add('hide');
+    tog.classList.remove('open');
+  } else {
+    det.querySelector('td').innerHTML = buildProfitDetail(bk, pk, oppMLevel, 1, ab);
+    det.classList.remove('hide');
+    tog.classList.add('open');
+  }
 });
 document.querySelectorAll('[data-opp-tab]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1198,6 +1444,7 @@ document.querySelectorAll('[data-opp-tab]').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('opp-pane-build').style.display   = oppMTab === 'build'   ? '' : 'none';
     document.getElementById('opp-pane-upgrade').style.display = oppMTab === 'upgrade' ? '' : 'none';
+    document.getElementById('opp-pane-retail').style.display  = oppMTab === 'retail'  ? '' : 'none';
     renderOppModal();
   });
 });
@@ -1213,6 +1460,10 @@ document.getElementById('oppMOwnedBtn').addEventListener('click', () => {
   oppMOwned = !oppMOwned;
   document.getElementById('oppMOwnedBtn').classList.toggle('active', oppMOwned);
   renderOppBuild();
+});
+document.getElementById('oppMRealm').addEventListener('change', e => {
+  _retailData = null; // invalidate cache when realm changes
+  fetchRetailData(e.target.value);
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1459,12 +1710,7 @@ function updateSummary() {
    BUILDING CONSTANTS  (wages, maxLvl from live API, cached 6h)
 ───────────────────────────────────────────────────────────────────────────── */
 function applyBuildingConstants(data) {
-  // Log the first building object so we can see every field the API returns.
-  // Remove this once we know the correct material field names.
-  if (data.length) console.log('[SC Advisor] buildings API sample entry:', JSON.stringify(data[0], null, 2));
-
   for (const b of data) {
-    // API may return db_letter (snake_case) or dbLetter (camelCase)
     const letter = b.db_letter != null ? String(b.db_letter)
                  : b.dbLetter  != null ? String(b.dbLetter)
                  : null;
@@ -1473,27 +1719,16 @@ function applyBuildingConstants(data) {
     if (!bld) continue;
     if (Array.isArray(b.levelImages) && b.levelImages.length > 0) bld.maxLvl = b.levelImages.length;
     if (b.wages != null && +b.wages > 0) bld.w = +b.wages;
-    // costUnits = number of Construction Units (kind 111) required per level upgrade
+    // costUnits drives the full upgrade cost formula — see getUpgradeCost()
     const cu = b.costUnits ?? b.cost_units ?? null;
     if (cu != null && +cu > 0) bld.costUnits = +cu;
-    // buildMats = construction material list (base cost for L1 build and each upgrade level)
-    // Field name varies by API version — try all known variants
-    const mats = b.building_materials ?? b.buildingMaterials ?? b.build_materials ?? b.buildMaterials ?? b.materials ?? null;
-    if (Array.isArray(mats) && mats.length) {
-      bld.buildMats = mats
-        .map(m => ({ k: +(m.resource ?? m.kind ?? m.k ?? 0), a: +(m.amount ?? m.qty ?? m.a ?? 0) }))
-        .filter(m => m.k > 0 && m.a > 0);
-    }
   }
 }
 
 async function loadBuildingConstants(force = false) {
   if (!force) {
     const cached = cGet('bldConst', ENCYC_TTL);
-    // Temporarily bypass cache so the debug log fires on every load.
-    // Remove this bypass once we've confirmed the API field names.
-    if (cached) applyBuildingConstants(cached); // still apply cached data immediately
-    // fall through to also fetch fresh so the sample log fires
+    if (cached) { applyBuildingConstants(cached); return; }
   }
   try {
     const res = await fetch(`${PROXY_URL}/api/v2/constants/buildings/`);
@@ -1505,32 +1740,6 @@ async function loadBuildingConstants(force = false) {
     }
   } catch (e) {
     console.warn('Building constants load failed:', e.message);
-  }
-
-  // Probe: check whether the encyclopedia has a buildings section with construction costs.
-  // Try a few likely URL patterns — log whatever comes back so we can see the structure.
-  // Web URL is /encyclopedia/0/building/{letter}/ so API mirrors our resource pattern:
-  // resources: /api/v4/en/0/encyclopedia/resources/0/{k}/
-  // buildings: /api/v4/en/0/encyclopedia/buildings/0/{letter}/  (most likely)
-  const probePaths = [
-    '/api/v4/en/0/encyclopedia/buildings/0/P/',   // Farm — plural "buildings" + realm 0
-    '/api/v4/en/0/encyclopedia/building/0/P/',    // Farm — singular "building" + realm 0
-    '/api/v4/en/0/encyclopedia/buildings/0/F/',   // Ranch — in case letter matters
-    '/api/v4/en/0/encyclopedia/building/0/F/',    // Ranch singular
-    '/api/v4/en/0/encyclopedia/buildings/P/',     // without realm segment
-    '/api/v4/en/0/encyclopedia/building/P/',      // singular without realm
-  ];
-  for (const path of probePaths) {
-    try {
-      const r = await fetch(`${PROXY_URL}${path}`);
-      if (r.ok) {
-        const d = await r.json();
-        console.log(`[SC Advisor] encyclopedia buildings probe HIT — ${path}`, JSON.stringify(Array.isArray(d) ? d[0] : d).slice(0, 800));
-        break;
-      } else {
-        console.log(`[SC Advisor] encyclopedia buildings probe ${r.status} — ${path}`);
-      }
-    } catch { /* skip */ }
   }
 }
 
@@ -1606,7 +1815,7 @@ async function _wakeServerImpl() {
   // the URL into a new tab, which is the one thing that reliably wakes the container.
   const _wakeFrame = document.createElement('iframe');
   _wakeFrame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
-  _wakeFrame.src = `${PROXY_URL}/ping?_wake=${Date.now()}`;
+  _wakeFrame.src = `${PROXY_URL}/healthz?_wake=${Date.now()}`;
   document.body.appendChild(_wakeFrame);
   // Clean up the iframe after 15s — by then the container is either awake or won't be.
   setTimeout(() => _wakeFrame.remove(), 15_000);
@@ -1615,7 +1824,7 @@ async function _wakeServerImpl() {
     try {
       const ctrl = new AbortController();
       const t    = setTimeout(() => ctrl.abort(), TIMEOUT);
-      const res  = await fetch(`${PROXY_URL}/ping`, { signal: ctrl.signal });
+      const res  = await fetch(`${PROXY_URL}/healthz`, { signal: ctrl.signal });
       clearTimeout(t);
       // Only trust a real { ok: true } JSON reply from our Express server.
       // SnapDeploy's sleep-proxy can return 200 OK with an HTML splash page
@@ -1630,7 +1839,7 @@ async function _wakeServerImpl() {
       status('Server is not responding — try refreshing in a moment.', false);
       return;
     }
-    status(`Server waking up… ${elapsed}s (usually ~30s on first load)`, true);
+    status(`Server waking up… ${elapsed}s (usually ~60s on first load)`, true);
     await new Promise(r => setTimeout(r, RETRY));
   }
 }
