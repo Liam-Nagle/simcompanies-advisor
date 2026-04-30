@@ -3,7 +3,7 @@
 /* ─────────────────────────────────────────────────────────────────────────────
    CONFIG
 ───────────────────────────────────────────────────────────────────────────── */
-const PROXY_URL  = 'https://osrs-bingo-bot.containers.snapdeploy.dev';
+const PROXY_URL  = 'https://simcompanies-advisor.liamnagle5.workers.dev';
 const BASE       = 'https://www.simcompanies.com';
 const TTL        = 5 * 60 * 1000;
 const ENCYC_TTL  = 6 * 60 * 60 * 1000;
@@ -1833,61 +1833,8 @@ async function loadEncyclopedia(force = false) {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   SERVER WAKE-UP
-   SnapDeploy containers sleep when idle and take ~30s to cold-start.
-   This pings /ping repeatedly and shows a live countdown so the user knows
-   what's happening.  Resolves as soon as the server responds (or times out).
-───────────────────────────────────────────────────────────────────────────── */
-// Cached promise — both the boot path and the cookie-sync path can call
-// wakeServer() and they all wait on the same underlying operation.
-let _wakePromise = null;
-function wakeServer() {
-  if (!_wakePromise) _wakePromise = _wakeServerImpl();
-  return _wakePromise;
-}
-async function _wakeServerImpl() {
-  const MAX_MS  = 180_000; // give up after 3 minutes (SnapDeploy cold starts are slow)
-  const RETRY   = 3_000;   // re-ping every 3s
-  const TIMEOUT = 8_000;   // abort each individual attempt after 8s
-  const start   = Date.now();
-
-  // Wake the container with a hidden iframe.
-  // fetch(), no-cors fetch, and image probes all fail to wake SnapDeploy because
-  // their cold-start proxy only triggers container boot on real browser navigation
-  // requests (Accept: text/html, proper Referer, no cross-origin fetch headers).
-  // An iframe IS a real browser navigation — it looks identical to the user typing
-  // the URL into a new tab, which is the one thing that reliably wakes the container.
-  const _wakeFrame = document.createElement('iframe');
-  _wakeFrame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
-  _wakeFrame.src = `${PROXY_URL}/healthz?_wake=${Date.now()}`;
-  document.body.appendChild(_wakeFrame);
-  // Clean up the iframe after 15s — by then the container is either awake or won't be.
-  setTimeout(() => _wakeFrame.remove(), 15_000);
-
-  while (true) {
-    try {
-      const ctrl = new AbortController();
-      const t    = setTimeout(() => ctrl.abort(), TIMEOUT);
-      const res  = await fetch(`${PROXY_URL}/healthz`, { signal: ctrl.signal });
-      clearTimeout(t);
-      // Only trust a real { ok: true } JSON reply from our Express server.
-      // SnapDeploy's sleep-proxy can return 200 OK with an HTML splash page
-      // before Express has started — checking the JSON body avoids a false positive.
-      if (res.ok) {
-        try { const j = await res.json(); if (j?.ok) return; } catch {}
-      }
-    } catch { /* CORS error or network error — container still waking */ }
-
-    const elapsed = Math.round((Date.now() - start) / 1000);
-    if (Date.now() - start >= MAX_MS) {
-      status('Server is not responding — try refreshing in a moment.', false);
-      return;
-    }
-    status(`Server waking up… ${elapsed}s (can take up to ~2 min on first load)`, true);
-    await new Promise(r => setTimeout(r, RETRY));
-  }
-}
+// Cloudflare Workers have no cold start — wakeServer() is a no-op.
+function wakeServer() { return Promise.resolve(); }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    TICKER LOAD
@@ -2438,10 +2385,10 @@ window.addEventListener('message', (event) => {
     // Wait for the server to be fully awake before firing API calls.
     // wakeServer() returns the same cached promise as the boot path, so if
     // the server is already up this resolves immediately.
-    wakeServer().then(() => Promise.all([loadFinancials(true), syncCompanyProfile()]));
+    Promise.all([loadFinancials(true), syncCompanyProfile()]);
   } else {
     // Cookie hasn't changed — still trigger a sync if we don't have warehouse data yet
-    if (!Object.keys(warehouseStock).length) wakeServer().then(() => syncCompanyProfile());
+    if (!Object.keys(warehouseStock).length) syncCompanyProfile();
   }
 });
 
@@ -2454,8 +2401,6 @@ window.addEventListener('message', (event) => {
   document.getElementById('psbInput').value = getPSB();
   document.getElementById('ssbInput').value = getSSB();
   renderBuildingList();
-  status('Connecting to server…', true);
-  await wakeServer();
   await Promise.all([loadEncyclopedia(), loadBuildingConstants()]);
   loadTicker();
   // If the user already has a stored cookie, auto-load account data on every page load
