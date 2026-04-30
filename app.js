@@ -196,13 +196,17 @@ const BLDS = [
   {k:'s', n:'Software R&D',                  w:448.5, c:'research',   maxLvl:3,  costUnits:19, o:[35]},
   {k:'l', n:'Launch Pad',                    w:724.5, c:'research',   maxLvl:3,  costUnits:36, o:[100]},
   {k:'q', n:'Kitchen',                       w:517.5, c:'research',   maxLvl:3,  costUnits:24, o:[145]},
-  // Retail/sale buildings — rpph is estimated units sold per hour per level
-  {k:'G', n:'Grocery Store',     w:138,   c:'retail', maxLvl:3, rpph:100, o:[121,117,122,9,120,134,124,125,126,119,3,4,5,6,72]},
-  {k:'N', n:'Restaurant',        w:207,   c:'retail', maxLvl:3, rpph:10,  o:[129,127,130,131,132,142,143]},
-  {k:'C', n:'Clothing Store',    w:138,   c:'retail', maxLvl:3, rpph:30,  o:[60,61,62,63,64,65]},
-  {k:'U', n:'Electronics Store', w:207,   c:'retail', maxLvl:3, rpph:8,   o:[24,25,26,27,28]},
-  {k:'V', n:'Auto Dealership',   w:276,   c:'retail', maxLvl:3, rpph:2,   o:[55,56,53,54,57]},
-  {k:'B', n:'Jewelry Store',     w:172.5, c:'retail', maxLvl:3, rpph:5,   o:[70,71]},
+  // Retail/sale buildings — rpph is estimated units sold per hour per level (fallback when cooperinc data unavailable)
+  {k:'G', n:'Grocery Store',     w:138,   c:'retail', maxLvl:3, rpph:100, o:[3,4,5,7,8,9,119,122,123,124,125,126,127,140,152]},
+  {k:'C', n:'Fashion Store',     w:310.5, c:'retail', maxLvl:3, rpph:25,  o:[60,61,62,63,64,65,70,71]},
+  {k:'U', n:'Electronics Store', w:172.5, c:'retail', maxLvl:3, rpph:8,   o:[24,25,26,27,28,98]},
+  {k:'V', n:'Car Dealership',    w:379.5, c:'retail', maxLvl:3, rpph:2,   o:[54,56,53,55,57]},
+  {k:'S', n:'Gas Station',       w:345,   c:'retail', maxLvl:3, rpph:80,  o:[11,12]},
+  {k:'P', n:'Spring Market',     w:241,   c:'retail', maxLvl:3, rpph:20,  o:[151,155]},
+  {k:'D', n:'Hardware Store',    w:172.5, c:'retail', maxLvl:3, rpph:30,  o:[102,103,108,109,110]},
+  {k:'W', n:'Halloween Market',  w:207,   c:'retail', maxLvl:3, rpph:20,  o:[146,147,148]},
+  {k:'X', n:'Xmas Market',       w:241.5, c:'retail', maxLvl:3, rpph:20,  o:[67,144,150]},
+  {k:'E', n:'Beach Market',      w:241.5, c:'retail', maxLvl:3, rpph:20,  o:[153,154]},
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -559,16 +563,17 @@ function renderBuildingList() {
       }
       const p = calcBuildingProfit(e.bk, e.pk, lvl, e.qty, abundance);
       if (!p) return `<span style="color:var(--muted)">—</span>`;
-      const c = p.profitDay >= 0 ? 'var(--green)' : 'var(--red)';
       const mkt2 = buildMarketMap();
       const warn = prod?.i?.some(inp => !mkt2[+inp.k]) ? ' <span style="color:var(--amber)" title="One or more input prices are $0 in the market ticker — actual profit may differ">⚠</span>' : '';
+      // Main = contract (MP−3%, half TU). Sub-line = exchange (−4% tax, full TU).
+      const cc = p.profitContract >= 0 ? 'var(--green)' : 'var(--red)';
+      const ce = p.profitExchange >= 0 ? 'var(--green)' : 'var(--red)';
       let upgradeHint = '';
       if (bld && lvl < (bld.maxLvl || 1)) {
-        // Use qty=1 so gain is per-building, not inflated by building count
         const curr1 = calcBuildingProfit(e.bk, e.pk, lvl,     1, abundance);
         const nxt1  = calcBuildingProfit(e.bk, e.pk, lvl + 1, 1, abundance);
         if (curr1 && nxt1) {
-          const gain    = nxt1.profitDay - curr1.profitDay;
+          const gain    = nxt1.profitContract - curr1.profitContract;
           const upgCost = getUpgradeCost(bld, lvl, mkt2) || null;
           const payback = upgCost && gain > 0 ? Math.ceil(upgCost / gain) : null;
           const gc      = gain >= 0 ? 'var(--green)' : 'var(--red)';
@@ -577,7 +582,15 @@ function renderBuildingList() {
           upgradeHint = `<div style="font-size:10px;color:${gc};margin-top:2px;white-space:nowrap">&#x2191; Lvl ${lvl+1}: ${gain >= 0 ? '+' : ''}${fmtSC(gain)}/day each${totalNote}${payNote}</div>`;
         }
       }
-      return `<div><span style="color:${c};font-weight:600">${p.profitDay >= 0 ? '+' : ''}${fmtSC(p.profitDay)}/day</span>${warn}</div>${upgradeHint}`;
+      const exchangeLine = `<div style="margin-top:2px;font-size:10px">
+        <span style="color:${ce}">${p.profitExchange >= 0?'+':''}${fmtSC(p.profitExchange)}/day exchange</span>
+        <span style="color:var(--muted)"> (−4% tax${p.transportDay ? ', −' + fmtSC(p.transportDay) + ' TU' : ''})</span>
+      </div>`;
+      return `<div>
+        <span style="color:${cc};font-weight:600">${p.profitContract >= 0?'+':''}${fmtSC(p.profitContract)}/day</span>
+        <span style="color:var(--muted);font-size:10px;font-weight:400"> contract (MP−3%${p.transportDay ? ', −' + fmtSC(p.transportDay * 0.5) + ' TU' : ''})</span>
+        ${warn}
+      </div>${exchangeLine}${upgradeHint}`;
     })();
     return `<tr class="bld-row">
       <td>${canDrill ? `<span class="tog" id="btog${i}" data-bld-tog="${i}">&#9658;</span>` : ''}</td>
@@ -617,12 +630,33 @@ function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
   const l      = lvl || 1;
   const q      = qty || 1;
   const ab     = bld.hasAbundance ? abundance : 1.0;
-  const pphEff = prod.pph * l * psb * ab;                       // abundance scales production rate
+  const pphEff = prod.pph * l * psb * ab;
   const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
-  const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;
+  const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;   // base revenue at market price
   const matDay = pphEff * 24 * matCPU * q;
-  const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);     // wages are fixed regardless of abundance
-  return { revDay, matDay, wagDay, profitDay: revDay - matDay - wagDay, pphEff, ab };
+  const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);
+  const profitDay = revDay - matDay - wagDay;           // before selling method costs
+
+  // Exchange: 4% tax on gross revenue, full TU cost
+  const taxDay         = revDay * 0.04;
+  const revExchangeDay = revDay - taxDay;               // effective revenue after tax
+
+  // Contract: MP −3% selling price, no tax, half TU cost
+  const revContractDay = revDay * 0.97;
+
+  // Transport — only available after encyclopedia sync
+  const tu      = prod.t;    // TU per item; undefined until encyclopedia loaded
+  const tuPrice = mkt[13] || 0;
+  const transportDay = (tu > 0 && tuPrice > 0) ? pphEff * 24 * q * tu * tuPrice : null;
+
+  const profitExchange = revExchangeDay - matDay - wagDay - (transportDay ?? 0);
+  const profitContract = revContractDay - matDay - wagDay - (transportDay !== null ? transportDay * 0.5 : 0);
+
+  return {
+    revDay, matDay, wagDay, profitDay, pphEff, ab,
+    taxDay, revExchangeDay, revContractDay,
+    transportDay, profitExchange, profitContract,
+  };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -1083,11 +1117,84 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
   const profRow = `
     <div class="pb-row">
       <div class="pb-label" style="font-size:13px;font-weight:700">
-        Profit / day
-        <span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:6px">${margin.toFixed(1)}% margin</span>
+        Gross profit / day
+        <span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:6px">${margin.toFixed(1)}% margin · before selling costs</span>
       </div>
       <div class="pb-price" style="color:${pc};font-weight:600">${profCPU >= 0 ? '+' : ''}${fmtSC(profCPU)}</div>
       <div class="pb-amount" style="font-size:14px;color:${pc}">${profDay >= 0 ? '+' : ''}${fmtSC(profDay)}</div>
+    </div>`;
+
+  // Selling method sections — exchange tax, TU costs, final profits
+  const tu      = prod.t;
+  const tuPrice = mkt[13] || 0;
+  const tuDay   = (tu > 0 && tuPrice > 0) ? unitDay * tu * tuPrice : null;
+  const tuCPU   = (tu > 0 && tuPrice > 0) ? tu * tuPrice : null;
+
+  const taxDay     = revDay * 0.04;
+  const taxCPU     = price * 0.04;
+  const contrDisc  = revDay * 0.03;          // MP −3% revenue reduction
+  const contrDCPU  = price * 0.03;
+
+  const exchProfit  = profDay - taxDay  - (tuDay ?? 0);
+  const contrProfit = profDay - contrDisc - (tuDay !== null ? tuDay * 0.5 : 0);
+  const ceExch  = exchProfit  >= 0 ? 'var(--green)' : 'var(--red)';
+  const ceContr = contrProfit >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const sectionLabel = (text) => `
+    <div class="pb-row" style="margin-top:6px">
+      <div class="pb-label" style="color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">${text}</div>
+      <div class="pb-price"></div><div class="pb-amount"></div>
+    </div>`;
+
+  const tuRowExch = tuDay !== null ? `
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">
+        ${iconHtml(13)}Transport (${fmtN(tu, 3)} TU/unit × ${fmtSC(tuPrice)})
+      </div>
+      <div class="pb-price">−${fmtSC(tuCPU)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(tuDay)}</div>
+    </div>` : '';
+
+  const tuRowContr = tuDay !== null ? `
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">
+        ${iconHtml(13)}Transport (${fmtN(tu * 0.5, 3)} TU/unit × ${fmtSC(tuPrice)}) · ½ rate
+      </div>
+      <div class="pb-price">−${fmtSC(tuCPU * 0.5)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(tuDay * 0.5)}</div>
+    </div>` : '';
+
+  const sellingSection = `
+    <div class="pb-divider"></div>
+    ${sectionLabel('Selling at exchange')}
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">Exchange tax (4%)</div>
+      <div class="pb-price">−${fmtSC(taxCPU)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(taxDay)}</div>
+    </div>
+    ${tuRowExch}
+    <div class="pb-row">
+      <div class="pb-label" style="font-size:13px;font-weight:700">Exchange profit / day</div>
+      <div class="pb-price" style="color:${ceExch};font-weight:600">${exchProfit >= 0?'+':''}${fmtSC(exchProfit / unitDay)}</div>
+      <div class="pb-amount" style="font-size:14px;color:${ceExch}">${exchProfit >= 0?'+':''}${fmtSC(exchProfit)}</div>
+    </div>
+    <div class="pb-divider"></div>
+    ${sectionLabel('Selling via contract (MP −3%)')}
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">Price discount (−3% vs market)</div>
+      <div class="pb-price">−${fmtSC(contrDCPU)}</div>
+      <div class="pb-amount" style="color:var(--red)">−${fmtSC(contrDisc)}</div>
+    </div>
+    <div class="pb-row">
+      <div class="pb-label" style="padding-left:18px;color:var(--muted)">Exchange tax</div>
+      <div class="pb-price" style="color:var(--muted)">$0</div>
+      <div class="pb-amount" style="color:var(--muted)">$0</div>
+    </div>
+    ${tuRowContr}
+    <div class="pb-row">
+      <div class="pb-label" style="font-size:13px;font-weight:700">Contract profit / day</div>
+      <div class="pb-price" style="color:${ceContr};font-weight:600">${contrProfit >= 0?'+':''}${fmtSC(contrProfit / unitDay)}</div>
+      <div class="pb-amount" style="font-size:14px;color:${ceContr}">${contrProfit >= 0?'+':''}${fmtSC(contrProfit)}</div>
     </div>`;
 
   return `<div class="detail-inner">
@@ -1099,6 +1206,7 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
       ${aoRow}
       <div class="pb-divider"></div>
       ${profRow}
+      ${sellingSection}
     </div>
   </div>`;
 }
@@ -1271,8 +1379,8 @@ let _retailData   = null;   // cached API response
 let _retailRealm  = 'r1';   // 'r1' = Magnates, 'r2' = Entrepreneurs
 const RETAIL_FORMULA_K = 1.15;  // empirical constant from formula derivation
 
-// Map our BLDS retail letter keys → cooperinc buildingID keys (both from SimCompanies db_letter)
-const RETAIL_BLD_MAP = { G:'G', N:'N', C:'H', U:'C', V:'2', B:'B' };
+// Map our BLDS retail letter keys → cooperinc buildingID keys (SimCompanies db_letter)
+const RETAIL_BLD_MAP = { G:'G', C:'H', U:'C', V:'2', S:'A', P:'I', D:'d', W:'t', X:'u', E:'z' };
 
 async function fetchRetailData(realm) {
   document.getElementById('oppRetailStatus').textContent = 'Loading retail data…';
@@ -1794,7 +1902,7 @@ async function loadBuildingConstants(force = false) {
 function applyEncyclopedia(data) {
   for (const [k, v] of Object.entries(data)) {
     if (!v) continue;
-    PROD[+k] = { n: v.n, pph: v.pph, i: v.i };
+    PROD[+k] = { n: v.n, pph: v.pph, t: v.t ?? 0, i: v.i };
   }
 }
 
@@ -1821,6 +1929,7 @@ async function loadEncyclopedia(force = false) {
     data[kinds[i]] = {
       n:   r.name,
       pph: r.producedAnHour,
+      t:   r.transportNeeded ?? 0,
       i:   (r.producedFrom || []).map(inp => ({
         k: inp.resource.db_letter,
         a: inp.amount,
