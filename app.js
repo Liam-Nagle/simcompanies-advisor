@@ -1223,6 +1223,7 @@ let oppMLevel      = 1;
 let oppMOwned      = false;
 let oppMSearch     = '';
 let oppMProfitMode = 'exchange'; // 'exchange' | 'contract'
+let oppMAbundance  = 60;         // % abundance for hasAbundance buildings (0–100)
 
 function openOppModal() {
   document.getElementById('oppModal').style.display = 'flex';
@@ -1256,7 +1257,7 @@ function renderOppBuild() {
     for (const pk of bld.o) {
       const prod = PROD[pk];
       if (!prod) continue;
-      const ab      = bld.hasAbundance ? 0.6 : 1.0;
+      const ab      = bld.hasAbundance ? oppMAbundance / 100 : 1.0;
       const pphEff  = prod.pph * lvl * psb * ab;
       const matCPU     = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
       const price      = mkt[+pk] || 0;
@@ -1594,7 +1595,7 @@ document.getElementById('oppMBuildTbody').addEventListener('click', e => {
   const bk  = row.dataset.bk;
   const pk  = parseInt(row.dataset.pk);
   const bld = BLDS.find(b => b.k === bk);
-  const ab  = bld?.hasAbundance ? 0.6 : 1.0;
+  const ab  = bld?.hasAbundance ? oppMAbundance / 100 : 1.0;
   if (!det.classList.contains('hide')) {
     det.classList.add('hide');
     tog.classList.remove('open');
@@ -1626,6 +1627,11 @@ document.getElementById('oppMSearch').addEventListener('input', e => {
 document.getElementById('oppMOwnedBtn').addEventListener('click', () => {
   oppMOwned = !oppMOwned;
   document.getElementById('oppMOwnedBtn').classList.toggle('active', oppMOwned);
+  renderOppBuild();
+});
+document.getElementById('oppMAbundance').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isNaN(v)) oppMAbundance = Math.max(0, Math.min(100, v));
   renderOppBuild();
 });
 document.getElementById('oppMExchangeBtn').addEventListener('click', () => {
