@@ -631,8 +631,9 @@ function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
   const q      = qty || 1;
   const ab     = bld.hasAbundance ? abundance : 1.0;
   const pphEff = prod.pph * l * psb * ab;
+  if (!mkt[+pk]) return null;  // no price in ticker — can't calculate meaningful profit
   const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
-  const revDay = pphEff * 24 * (mkt[+pk] || 0) * q;   // base revenue at market price
+  const revDay = pphEff * 24 * mkt[+pk] * q;   // base revenue at market price
   const matDay = pphEff * 24 * matCPU * q;
   const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);
   const profitDay = revDay - matDay - wagDay;           // before selling method costs
@@ -744,6 +745,7 @@ function recalculate() {
   renderSurplus();
   renderDeficit();
   updateSummary();
+  renderBuildingList();
   // Opportunities panel is rendered on demand (via the modal button) — not auto-shown here.
   if (Object.keys(warehouseStock).length) updateWarehouseDisplay(document.getElementById('whSearch')?.value || '');
 }
