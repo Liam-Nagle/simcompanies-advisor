@@ -27,6 +27,14 @@
           <input type="number" id="oppMLevel" value="1" min="1" max="15" class="ao-inp" style="width:44px">
         </label>
         <button class="sbtn" id="oppMOwnedBtn">Owned only</button>
+        <span style="display:inline-flex;gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden">
+          <button class="sbtn active" id="oppMExchangeBtn"
+                  style="border:none;border-radius:0;margin:0;padding:3px 10px;font-size:11px"
+                  title="Sort by profit after 4% exchange tax">Exchange</button>
+          <button class="sbtn" id="oppMContractBtn"
+                  style="border:none;border-left:1px solid var(--border);border-radius:0;margin:0;padding:3px 10px;font-size:11px"
+                  title="Sort by profit after 3% contract price discount">Contract</button>
+        </span>
         <input id="oppMSearch" type="search" placeholder="Filter building or product…"
                style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 8px;font-size:11px;width:180px;outline:none;color-scheme:dark;margin-left:auto">
       </div>
@@ -37,7 +45,7 @@
               <th style="width:20px"></th>
               <th>Building</th>
               <th>Product</th>
-              <th class="num">Profit/day</th>
+              <th class="num" id="oppMProfitHdr">Exchange profit/day</th>
               <th>Covers a Deficit?</th>
               <th class="num">Build Cost</th>
               <th class="num">Payback</th>

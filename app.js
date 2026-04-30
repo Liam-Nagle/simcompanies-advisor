@@ -615,6 +615,8 @@ function renderBuildingList() {
 /* ─────────────────────────────────────────────────────────────────────────────
    CALCULATION ENGINE
 ───────────────────────────────────────────────────────────────────────────── */
+const EXCH_TAX_RATE  = 0.04;  // 4% exchange tax on revenue when selling at exchange
+const CONT_DISC_RATE = 0.03;  // 3% price discount when selling via contract (MP −3%)
 function buildMarketMap() {
   const m = {};
   for (const t of ticker) m[+t.kind] = +(t.price || 0);
@@ -1116,7 +1118,7 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
       <div class="pb-amount" style="color:var(--red)">−${fmtSC(aoWagDay)}</div>
     </div>` : '';
 
-  const profRow = `
+  const grossProfRow = `
     <div class="pb-row">
       <div class="pb-label" style="font-size:13px;font-weight:700">
         Gross profit / day
@@ -1134,7 +1136,7 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
 
   const taxDay     = revDay * 0.04;
   const taxCPU     = price * 0.04;
-  const contrDisc  = revDay * 0.03;          // MP −3% revenue reduction
+  const contrDisc  = revDay * 0.03;
   const contrDCPU  = price * 0.03;
 
   const exchProfit  = profDay - taxDay  - (tuDay ?? 0);
@@ -1207,7 +1209,7 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
       ${wagRow}
       ${aoRow}
       <div class="pb-divider"></div>
-      ${profRow}
+      ${grossProfRow}
       ${sellingSection}
     </div>
   </div>`;
@@ -1216,10 +1218,11 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
 /* ─────────────────────────────────────────────────────────────────────────────
    OPPORTUNITIES MODAL
 ───────────────────────────────────────────────────────────────────────────── */
-let oppMTab    = 'build';
-let oppMLevel  = 1;
-let oppMOwned  = false;
-let oppMSearch = '';
+let oppMTab        = 'build';
+let oppMLevel      = 1;
+let oppMOwned      = false;
+let oppMSearch     = '';
+let oppMProfitMode = 'exchange'; // 'exchange' | 'contract'
 
 function openOppModal() {
   document.getElementById('oppModal').style.display = 'flex';
@@ -1255,16 +1258,22 @@ function renderOppBuild() {
       if (!prod) continue;
       const ab      = bld.hasAbundance ? 0.6 : 1.0;
       const pphEff  = prod.pph * lvl * psb * ab;
-      const matCPU  = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
-      const revDay  = pphEff * 24 * (mkt[+pk] || 0);
-      const wagDay  = bld.w * lvl * 24 * (1 + getAO() / 100);
-      const profDay = revDay - pphEff * 24 * matCPU - wagDay;
+      const matCPU     = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+      const price      = mkt[+pk] || 0;
+      const revDay     = pphEff * 24 * price;
+      const wagDay     = bld.w * lvl * 24 * (1 + getAO() / 100);
+      const grossDay   = revDay - pphEff * 24 * matCPU - wagDay;
+      const tuCostDay  = (prod.t > 0 && mkt[13]) ? pphEff * 24 * prod.t * mkt[13] : 0;
+      const exchProfDay = grossDay - revDay * EXCH_TAX_RATE - tuCostDay;
+      const contProfDay = grossDay - revDay * CONT_DISC_RATE - tuCostDay * 0.5;
+      const profDay    = oppMProfitMode === 'exchange' ? exchProfDay : contProfDay;
       const owned         = playerBuildings.some(e => e.bk === bld.k && e.pk === pk);
       const missingInputs = prod.i.some(inp => !mkt[+inp.k]);
       // Build cost = 1 × base cost (same formula as upgrading from L1 → L2)
       const buildCost = getUpgradeCost(bld, 1, mkt);
       const payback   = buildCost > 0 && profDay > 0 ? Math.ceil(buildCost / profDay) : null;
-      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n, profDay, owned,
+      rows.push({ bldName: bld.n, bk: bld.k, pk, prodName: prod.n,
+                  profDay, exchProfDay, contProfDay, owned,
                   missingInputs, hasAbundance: bld.hasAbundance,
                   def: defMap[pk] || null, buildCost, payback });
     }
@@ -1309,6 +1318,9 @@ function renderOppBuild() {
     </tr>
     <tr class="detail-tr hide" id="omdet${i}"><td colspan="7"></td></tr>`;
   }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">No results</td></tr>`;
+
+  const hdr = document.getElementById('oppMProfitHdr');
+  if (hdr) hdr.textContent = oppMProfitMode === 'exchange' ? 'Exchange profit/day' : 'Contract profit/day';
 }
 
 function renderOppUpgrade() {
@@ -1614,6 +1626,18 @@ document.getElementById('oppMSearch').addEventListener('input', e => {
 document.getElementById('oppMOwnedBtn').addEventListener('click', () => {
   oppMOwned = !oppMOwned;
   document.getElementById('oppMOwnedBtn').classList.toggle('active', oppMOwned);
+  renderOppBuild();
+});
+document.getElementById('oppMExchangeBtn').addEventListener('click', () => {
+  oppMProfitMode = 'exchange';
+  document.getElementById('oppMExchangeBtn').classList.add('active');
+  document.getElementById('oppMContractBtn').classList.remove('active');
+  renderOppBuild();
+});
+document.getElementById('oppMContractBtn').addEventListener('click', () => {
+  oppMProfitMode = 'contract';
+  document.getElementById('oppMContractBtn').classList.add('active');
+  document.getElementById('oppMExchangeBtn').classList.remove('active');
   renderOppBuild();
 });
 document.getElementById('oppMRealm').addEventListener('change', e => {
