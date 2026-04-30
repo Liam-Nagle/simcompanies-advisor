@@ -1294,21 +1294,99 @@ async function fetchRetailData(realm) {
   renderBuildingList();
 }
 
+function calcRetailProductRow(pid, phase, weather, adj, wageDay, mkt, livePrices, mktData, phaseData) {
+  const pd = phaseData[pid]?.['0']?.[phase];
+  if (!pd) return null;
+  const sat       = mktData[pid]?.['0']?.saturation || 1;
+  const unitsHr   = pd.W * sat * weather * RETAIL_FORMULA_K * adj;
+  // Use retail exchange price (livePrices) as sell price — higher than wholesale
+  const sellPrice = livePrices[pid]?.['0'] || mkt[pid] || 0;
+  if (!sellPrice) return null;
+  const cpuMarket = mkt[pid] || sellPrice;   // wholesale cost if buying stock
+  const unitsDay  = unitsHr * 24;
+  const grossDay  = unitsDay * sellPrice;
+  const cpuOwn    = calcCostPerUnit(+pid, mkt);
+  const cpuTheory = theoreticalCostPerUnit(+pid, mkt);
+  const selfCpu   = cpuOwn ?? cpuTheory;
+  const mktNetDay  = grossDay - wageDay - unitsDay * cpuMarket;
+  const selfNetDay = selfCpu != null ? grossDay - wageDay - unitsDay * selfCpu : null;
+  const selfSupplied  = cpuOwn !== null;
+  const currentNetDay = selfSupplied && selfNetDay != null ? selfNetDay : mktNetDay;
+  const rankVal       = selfNetDay ?? mktNetDay;
+  return { pid, name: PROD[pid]?.n || `#${pid}`,
+           unitsHr, unitsDay, grossDay, wageDay, sellPrice, cpuMarket,
+           selfCpu, selfSupplied, mktNetDay, selfNetDay, currentNetDay, sat, rankVal };
+}
+
+function renderRetailProductTable(productRows, wageDay) {
+  if (!productRows.length) return '<p style="color:var(--muted);font-size:12px;padding:8px">No product data available.</p>';
+
+  const fmtN2 = (v, isBest) => {
+    if (v == null) return `<span style="color:var(--muted)">—</span>`;
+    const c = v >= 0 ? 'var(--green)' : 'var(--red)';
+    return `<span style="color:${c};font-weight:${isBest?700:400}">${v>=0?'+':''}${fmtSC(v)}/day</span>`;
+  };
+
+  const headerRow = `<tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)">
+    <th style="text-align:left;padding:5px 8px;font-weight:600">Product</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Units/Hr</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Sell Price</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Buy Cost</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Gross Rev/Day</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Net (Market)</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Net (Self-Supply)</th>
+    <th style="text-align:right;padding:5px 8px;font-weight:600">Net (Current) &#9660;</th>
+  </tr>`;
+
+  const dataRows = productRows.map((p, i) => {
+    const isBest = i === 0;
+    const supply = p.selfSupplied
+      ? `<span style="color:var(--green);font-size:10px">&#10003; own</span>`
+      : `<span style="color:var(--amber);font-size:10px">buy</span>`;
+    const bg = isBest ? 'background:rgba(34,197,94,.07)' : (i%2===0?'':'background:rgba(255,255,255,.02)');
+    return `<tr style="${bg}">
+      <td style="padding:5px 8px">
+        <div style="display:flex;align-items:center;gap:6px">
+          ${isBest ? '<span style="color:var(--gold)">&#9733;</span>' : '<span style="width:14px;display:inline-block"></span>'}
+          ${iconHtml(p.pid)}<strong style="font-size:12px">${esc(p.name)}</strong>
+          ${supply}
+          <span style="color:var(--muted);font-size:10px">sat ${p.sat.toFixed(2)}</span>
+        </div>
+      </td>
+      <td style="text-align:right;padding:5px 8px;color:var(--muted);font-size:12px">${fmtN(p.unitsHr,1)}/hr</td>
+      <td style="text-align:right;padding:5px 8px;color:var(--muted);font-size:12px">${fmtSC(p.sellPrice)}</td>
+      <td style="text-align:right;padding:5px 8px;color:var(--muted);font-size:12px">${fmtSC(p.cpuMarket)}</td>
+      <td style="text-align:right;padding:5px 8px;color:var(--muted);font-size:12px">${fmtSC(p.grossDay)}/day</td>
+      <td style="text-align:right;padding:5px 8px">${fmtN2(p.mktNetDay,  !p.selfSupplied && isBest)}</td>
+      <td style="text-align:right;padding:5px 8px">${fmtN2(p.selfNetDay, p.selfSupplied && isBest)}</td>
+      <td style="text-align:right;padding:5px 8px">${fmtN2(p.currentNetDay, isBest)}</td>
+    </tr>`;
+  }).join('');
+
+  const wageLine = `<tr style="border-top:1px solid var(--border)">
+    <td colspan="4" style="padding:5px 8px;color:var(--muted);font-size:11px">Wages (shared cost — same regardless of product)</td>
+    <td colspan="4" style="text-align:right;padding:5px 8px;color:var(--muted);font-size:11px">−${fmtSC(wageDay)}/day</td>
+  </tr>`;
+
+  return `<table style="width:100%;border-collapse:collapse">${headerRow}${dataRows}${wageLine}</table>`;
+}
+
 function renderOppRetail() {
   const tbody = document.getElementById('oppMRetailTbody');
   if (!_retailData) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">
-      Retail data not loaded — select a realm above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">
+      Select a realm to load retail data.</td></tr>`;
     return;
   }
 
-  const mkt      = buildMarketMap();
-  const phase    = _retailData.economyPhase;
-  const weather  = _retailData.weatherMultiplier || 1;
-  const buildings = _retailData.buildings  || {};
-  const phaseData = _retailData.productPhaseData || {};
-  const mktData   = _retailData.marketData || {};
-  const bldData   = _retailData.buildingData || {};
+  const mkt        = buildMarketMap();
+  const phase      = _retailData.economyPhase;
+  const weather    = _retailData.weatherMultiplier || 1;
+  const buildings  = _retailData.buildings         || {};
+  const phaseData  = _retailData.productPhaseData  || {};
+  const mktData    = _retailData.marketData         || {};
+  const bldData    = _retailData.buildingData       || {};
+  const livePrices = _retailData.livePrices         || {};
 
   const rows = [];
 
@@ -1321,89 +1399,44 @@ function renderOppRetail() {
 
     const wageDay  = (bldData[coopId]?.baseWage || bld.w) * 24;
     const adj      = bldData[coopId]?.retailAdjustment ?? 1;
-    const products = coopBld.products || [];
 
-    // Find best product ranked by self-supply net profit (best realistic scenario)
-    let bestProduct = null, bestProfit = -Infinity;
+    const productRows = (coopBld.products || [])
+      .map(pid => calcRetailProductRow(pid, phase, weather, adj, wageDay, mkt, livePrices, mktData, phaseData))
+      .filter(Boolean)
+      .sort((a, b) => b.currentNetDay - a.currentNetDay);
 
-    for (const pid of products) {
-      const pd = phaseData[pid]?.['0']?.[phase];
-      if (!pd) continue;
-      const sat      = mktData[pid]?.['0']?.saturation || 1;
-      const unitsHr  = pd.W * sat * weather * RETAIL_FORMULA_K * adj;
-      const price    = mkt[pid] || 0;
-      if (!price) continue;
-      const unitsDay = unitsHr * 24;
-      const grossDay = unitsDay * price;
-
-      // Market scenario: buy goods at market price
-      const mktNetDay = grossDay - wageDay - unitsDay * price;
-
-      // Self-supply scenario: use own production cost if available,
-      // otherwise compute theoretical L1 cost so the column always shows
-      const cpuOwn     = calcCostPerUnit(+pid, mkt);
-      const cpuTheory  = theoreticalCostPerUnit(+pid, mkt);
-      const selfCpu    = cpuOwn ?? cpuTheory;
-      const selfNetDay = selfCpu != null ? grossDay - wageDay - unitsDay * selfCpu : null;
-      const selfSupplied = cpuOwn !== null;  // actually producing it right now
-
-      // Current net = what the player actually experiences today
-      const currentNetDay = selfSupplied && selfNetDay != null ? selfNetDay : mktNetDay;
-
-      // Rank by self-supply net (best achievable)
-      const rankVal = selfNetDay ?? mktNetDay;
-      if (rankVal > bestProfit) {
-        bestProfit = rankVal;
-        bestProduct = { pid, name: PROD[pid]?.n || `#${pid}`,
-                        unitsHr, unitsDay, grossDay, wageDay,
-                        mktNetDay, selfNetDay, selfCpu, selfSupplied, currentNetDay,
-                        sat, price };
-      }
-    }
-
-    rows.push({ bld, wageDay, bestProduct });
+    const best = productRows[0] || null;
+    rows.push({ bld, coopId, wageDay, productRows, best });
   }
 
   rows.sort((a, b) => {
-    const aVal = a.bestProduct ? (a.bestProduct.selfNetDay ?? a.bestProduct.mktNetDay) : -Infinity;
-    const bVal = b.bestProduct ? (b.bestProduct.selfNetDay ?? b.bestProduct.mktNetDay) : -Infinity;
-    return bVal - aVal;
+    const av = a.best?.currentNetDay ?? -Infinity;
+    const bv = b.best?.currentNetDay ?? -Infinity;
+    return bv - av;
   });
 
-  const fmtNet = (val, isCurrent) => {
-    if (val == null) return `<span style="color:var(--muted)">—</span>`;
-    const c = val >= 0 ? 'var(--green)' : 'var(--red)';
-    const bold = isCurrent ? 'font-weight:700' : 'font-weight:400;opacity:0.75';
-    const marker = isCurrent ? ' &#9664;' : '';
-    return `<span style="color:${c};${bold}">${val>=0?'+':''}${fmtSC(val)}/day${marker}</span>`;
-  };
-
   tbody.innerHTML = rows.map((r, i) => {
-    const bp = r.bestProduct;
-    if (!bp) return `<tr>
-      <td></td><td>${esc(r.bld.n)}</td>
-      <td colspan="6" style="color:var(--muted);font-size:12px">No live price data for products in this building</td>
-    </tr>`;
-
-    const supplyBadge = bp.selfSupplied
-      ? `<span style="color:var(--green);font-size:10px">&#10003; own production</span>`
-      : `<span style="color:var(--amber);font-size:10px">buying at market</span>`;
+    const bp = r.best;
+    const gc = bp ? (bp.currentNetDay >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--muted)';
+    const bestLabel = bp
+      ? `<div class="res" style="display:inline-flex">${iconHtml(bp.pid)}<span style="font-size:12px">${esc(bp.name)}</span>
+           <span style="color:${gc};font-size:12px;font-weight:600;margin-left:8px">${bp.currentNetDay>=0?'+':''}${fmtSC(bp.currentNetDay)}/day</span></div>`
+      : `<span style="color:var(--muted);font-size:12px">No data</span>`;
 
     return `
-    <tr class="retail-row" style="cursor:default">
+    <tr class="retail-bld-row" data-retail-idx="${i}" style="cursor:pointer">
       <td><span class="tog" id="mrtog${i}">&#9658;</span></td>
       <td><strong>${esc(r.bld.n)}</strong></td>
-      <td><div class="res">${iconHtml(bp.pid)}${esc(bp.name)}
-        <span style="color:var(--muted);font-size:10px;margin-left:4px">sat ${bp.sat.toFixed(2)}</span>
-        <div style="margin-top:2px">${supplyBadge}</div>
-      </div></td>
-      <td class="num" style="color:var(--muted)">${fmtN(bp.unitsHr, 1)}/hr</td>
-      <td class="num" style="color:var(--muted)">${fmtSC(bp.grossDay)}/day</td>
-      <td class="num">${fmtNet(bp.mktNetDay,  !bp.selfSupplied)}</td>
-      <td class="num">${fmtNet(bp.selfNetDay,  bp.selfSupplied)}</td>
-      <td class="num">${fmtNet(bp.currentNetDay, true)}</td>
+      <td colspan="5">${bestLabel}
+        <span style="color:var(--muted);font-size:11px;margin-left:12px">&#9660; ${r.productRows.length} products — click to expand</span>
+      </td>
+      <td class="num" style="color:var(--muted);font-size:11px">wages: ${fmtSC(r.wageDay)}/day</td>
     </tr>
-    <tr class="detail-tr hide" id="mrdet${i}"><td colspan="8"></td></tr>`;
+    <tr class="detail-tr hide" id="mrdet${i}">
+      <td colspan="8" style="padding:0 0 0 28px;background:var(--bg3)">
+        ${renderRetailProductTable(r.productRows, r.wageDay)}
+      </td>
+    </tr>`;
   }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No retail buildings found.</td></tr>`;
 }
 
@@ -1412,6 +1445,18 @@ document.getElementById('oppModalBtn').addEventListener('click', openOppModal);
 document.getElementById('oppModalClose').addEventListener('click', closeOppModal);
 document.getElementById('oppModal').addEventListener('click', e => {
   if (e.target === document.getElementById('oppModal')) closeOppModal();
+});
+
+// Expandable detail rows in the Retail tab
+document.getElementById('oppMRetailTbody').addEventListener('click', e => {
+  const row = e.target.closest('.retail-bld-row');
+  if (!row) return;
+  const i   = row.dataset.retailIdx;
+  const det = document.getElementById('mrdet' + i);
+  const tog = document.getElementById('mrtog' + i);
+  if (!det) return;
+  det.classList.toggle('hide');
+  tog.classList.toggle('open', !det.classList.contains('hide'));
 });
 
 // Expandable detail rows in the Build tab
@@ -1802,9 +1847,9 @@ function wakeServer() {
   return _wakePromise;
 }
 async function _wakeServerImpl() {
-  const MAX_MS  = 90_000;  // give up after 90s
-  const RETRY   = 2_000;   // re-ping every 2s
-  const TIMEOUT = 5_000;   // abort each individual attempt after 5s
+  const MAX_MS  = 180_000; // give up after 3 minutes (SnapDeploy cold starts are slow)
+  const RETRY   = 3_000;   // re-ping every 3s
+  const TIMEOUT = 8_000;   // abort each individual attempt after 8s
   const start   = Date.now();
 
   // Wake the container with a hidden iframe.
@@ -1839,7 +1884,7 @@ async function _wakeServerImpl() {
       status('Server is not responding — try refreshing in a moment.', false);
       return;
     }
-    status(`Server waking up… ${elapsed}s (usually ~60s on first load)`, true);
+    status(`Server waking up… ${elapsed}s (can take up to ~2 min on first load)`, true);
     await new Promise(r => setTimeout(r, RETRY));
   }
 }
