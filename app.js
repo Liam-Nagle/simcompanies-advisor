@@ -634,7 +634,10 @@ function calcBuildingProfit(bk, pk, lvl, qty, abundance = 1.0) {
   const ab     = bld.hasAbundance ? abundance : 1.0;
   const pphEff = prod.pph * l * psb * ab;
   if (!mkt[+pk]) return null;  // no price in ticker — can't calculate meaningful profit
-  const matCPU = prod.i.reduce((s, i) => s + i.a * (mkt[+i.k] || 0), 0);
+  const matCPU = prod.i.reduce((s, i) => {
+    const ownCost = calcCostPerUnit(+i.k, mkt);
+    return s + i.a * (ownCost !== null ? ownCost : (mkt[+i.k] || 0));
+  }, 0);
   const revDay = pphEff * 24 * mkt[+pk] * q;   // base revenue at market price
   const matDay = pphEff * 24 * matCPU * q;
   const wagDay = bld.w * l * 24 * q * (1 + getAO() / 100);
@@ -1046,15 +1049,22 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
   const aoWagDay    = wagBaseDay * ao / 100;
   const wagDay      = wagBaseDay + aoWagDay;
 
-  const inputs = prod.i.map(inp => ({
-    k:    +inp.k,
-    n:    PROD[+inp.k]?.n || `Resource #${inp.k}`,
-    a:    inp.a,
-    p:    mkt[+inp.k] || 0,
-    cpu:  inp.a * (mkt[+inp.k] || 0),
-    cDay: inp.a * unitDay * (mkt[+inp.k] || 0),
-    zero: !mkt[+inp.k],
-  }));
+  const inputs = prod.i.map(inp => {
+    const mktP  = mkt[+inp.k] || 0;
+    const ownP  = calcCostPerUnit(+inp.k, mkt);
+    const p     = ownP !== null ? ownP : mktP;
+    return {
+      k:     +inp.k,
+      n:     PROD[+inp.k]?.n || `Resource #${inp.k}`,
+      a:     inp.a,
+      p,
+      mktP,
+      isOwn: ownP !== null,
+      cpu:   inp.a * p,
+      cDay:  inp.a * unitDay * p,
+      zero:  !mktP && ownP === null,
+    };
+  });
   const matCPU  = inputs.reduce((s, i) => s + i.cpu, 0);
   const matDay  = inputs.reduce((s, i) => s + i.cDay, 0);
   const profCPU = price - matCPU - wagCPUTotal;
@@ -1093,6 +1103,7 @@ function buildProfitDetail(bk, pk, lvl, qty, abundance = 1.0) {
       <div class="pb-label" style="padding-left:18px;color:var(--muted)">
         ${iconHtml(inp.k)}${esc(inp.n)}
         <span style="opacity:.5;font-size:10px">${fmtN(inp.a)}× per unit</span>
+        ${inp.isOwn ? `<span style="color:var(--green);font-size:10px" title="Using your production cost (${fmtSC(inp.p)}) instead of market price (${fmtSC(inp.mktP)})">✓ own cost</span>` : ''}
         ${inp.zero ? `<span style="color:var(--amber)" title="No market price — treated as $0">⚠</span>` : ''}
       </div>
       <div class="pb-price">${inp.zero ? '<span style="color:var(--amber)">no price</span>' : '−' + fmtSC(inp.cpu)}</div>
