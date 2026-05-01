@@ -1291,7 +1291,7 @@ function renderOppBuild() {
     const warn = r.missingInputs
       ? ' <span style="color:var(--amber)" title="One or more input prices are $0">⚠</span>' : '';
     const abund = r.hasAbundance
-      ? ' <span style="color:var(--amber);font-size:10px" title="Calculated at 60% mean abundance">60% abund.</span>' : '';
+      ? ` <span style="color:var(--amber);font-size:10px" title="Calculated at ${oppMAbundance}% abundance">${oppMAbundance}% abund.</span>` : '';
     const owned = r.owned
       ? ' <span class="badge" style="color:var(--green);border-color:var(--green)">owned</span>' : '';
 
