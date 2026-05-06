@@ -695,27 +695,25 @@ function calcRetailProfit(bk, pk, lvl, qty) {
   const adj     = bldInfo?.retailAdjustment ?? 1;
   const pd      = _retailData.productPhaseData?.[pk]?.['0']?.[phase];
   if (!pd) return null;
-  const sat       = _retailData.marketData?.[pk]?.['0']?.saturation ?? 1;
-  const avgPrice  = _retailData.marketData?.[pk]?.['0']?.averagePrice || 0;
-  const mkt       = buildMarketMap();
-  const price     = avgPrice || mkt[+pk] || 0;
-  if (!price) return null;
-  const ao        = getAO() / 100;
-  const ssb       = 1 + getSSB() / 100;
-  const unitsHr   = gnRetailUnitsHr(price, 0, pd, sat, adj, weather, ao) * ssb;
+  const sat      = _retailData.marketData?.[pk]?.['0']?.saturation ?? 1;
+  const mkt      = buildMarketMap();
+  const buyCost  = _retailData.livePrices?.[pk]?.['0'] || mkt[+pk] || 0;
+  if (!buyCost) return null;
+  const ssb      = getSSB();
+  const ao       = getAO();
+  const wagDay0  = (BLDS.find(b => b.k === bk)?.w || 0) * (lvl||1) * (qty||1) * 24;
+  const opt      = findRetailOptimal(0, pd, sat, buyCost, ssb, ao, adj, wagDay0, +pk);
+  if (!opt) return null;
+  const { optimalPrice: price, unitsHr } = opt;
   const l = lvl || 1, q = qty || 1;
-  const unitsDay = unitsHr * l * q * 24;
-  const revDay   = unitsDay * price;
-  const wagDay   = (BLDS.find(b => b.k === bk)?.w || 0) * l * q * 24 * (1 + getAO() / 100);
-
+  const unitsDay  = unitsHr * l * q * 24;
+  const revDay    = unitsDay * price;
+  const wagDay    = wagesAdjDay * l * q;    // scale already-AO-adjusted wages by lvl/qty
   const cpuOwn    = calcCostPerUnit(+pk, mkt);
-  // COGS: use exchange price (livePrices) as buy cost if not self-producing
-  const exchangeCpu = _retailData.livePrices?.[pk]?.['0'] || mkt[+pk] || price;
-  const cogsCpu   = cpuOwn !== null ? cpuOwn : exchangeCpu;
+  const cogsCpu   = cpuOwn !== null ? cpuOwn : buyCost;
   const cogsDay   = unitsDay * cogsCpu;
   const selfSupplied = cpuOwn !== null;
-
-  const profDay = revDay - wagDay - cogsDay;
+  const profDay   = revDay - wagDay - cogsDay;
 
   return { unitsHr, unitsDay, revDay, wagDay, cogsDay, cogsCpu, profDay, price, sat, selfSupplied };
 }
@@ -1407,45 +1405,114 @@ function renderOppUpgrade() {
 ───────────────────────────────────────────────────────────────────────────── */
 let _retailData   = null;   // cached API response
 let _retailRealm  = 'r1';   // 'r1' = Magnates, 'r2' = Entrepreneurs
-// Cooperinc Gn demand formula — computes units/hr sold at a given retail price.
-// livePrices from the cooperinc API = SimCompanies exchange (wholesale/buy) prices.
-// marketData.averagePrice = retail sell price (what consumers pay in-store).
-// Source: reverse-engineered from cooperinc.xyz/assets/index-WBbS0KuD.js
-function gnRetailUnitsHr(sellPrice, quality, pd, sat, adj, weather, ao) {
-  const l = (pd.W || 0) * weather;   // weather-adjusted base demand (W × weather)
-  const c = pd.V || 0;               // store wages
-  const d = pd.T || 0;               // building levels needed per unit/hr
-  const p = pd.U || 0;               // modeled production cost per unit
-  const u = 0.3;                     // retailModelingQualityWeight (0.3 for all non-tree products)
+// ── Cooperinc retail demand formula (Jn function) ──────────────────────────
+// Source: reverse-engineered from cooperinc.xyz/assets/index-DCHh7r5O.js (j1/Jn/is)
+//
+// Key findings from source analysis:
+//   • livePrices[pid][q]      = exchange (wholesale/buy) price → unit COST
+//   • r parameter             = SSB (Sales Bonus %), NOT admin overhead
+//   • Admin overhead          = used only in wage calc, not demand formula
+//   • Weather (n parameter)   = 1 for ALL products except pid 153 and 154
+//   • a parameter             = total building levels (use 1 for per-level rate)
+//   • Sell price shown        = OPTIMAL price via golden-section search
+//   • W/sat/etc               = Q0 fallback when per-quality data absent in API
+//
+// jnRetailUnitsHr: units/hr at a specific sell price (Jn function)
+function jnRetailUnitsHr(sellPrice, quality, pd, sat, ssb, adj, pid) {
+  const l = pd.W || 0;                              // W — NO weather applied
+  const c = pd.V || 0;                              // store wages (V field)
+  const d = pd.T || 0;                              // T field
+  const p = pd.U || 0;                              // production cost (U field)
+  const qualW = pid === 150 ? 0 : 0.3;              // retailModelingQualityWeight
 
   const s = sat;
   const m = Math.min(Math.max(2 - s, 0), 2);
   const h = Math.max(0.9, m / 2 + 0.5);
-  const f = l * h;
+  const f = l * h;                                  // base demand (no weather here)
   if (f <= 0) return 0;
 
-  const S = quality * u / 12 + 1;
-  const C = l * d + 1;
-  const R = 370 * C * (m / 2) * S;  // Ki.fir=370, Ki.air=0 so +c*0 term omitted
-  const K = R + c;
-  const M = sellPrice - p;
-  if (M <= 0 || K <= 0) return 0;
+  const S = quality * qualW / 12 + 1;              // quality factor
+  const C = l * d + 1;                              // level factor
+  const R = 370 * C * (m / 2) * S;                 // ns.fir=370, ns.air=0
+  const K = R + c;                                  // total cost component
+  const D = sellPrice - p;
+  if (D <= 0 || K <= 0) return 0;
 
-  const j = p + K / f;
-  const O = f * f / K;
-  const G = R - Math.pow(sellPrice - j, 2) * O + c;
-  if (G <= 0) return 0;
+  const j  = p + K / f;                             // demand-optimal price
+  const Rf = f * f / K;
+  const M  = R - Math.pow(sellPrice - j, 2) * Rf + c;
+  if (M <= 0) return 0;
 
-  const oe = 100 * M * 3600 - c;
+  const oe = 100 * D * 3600 - c;
   if (oe <= 0) return 0;
 
-  let re = ao;
-  if (Math.abs(re) > 1) re = re / 100;
-  const A = 1 - re;
-  const V = (oe / G) * A;
-  if (V <= 0) return 0;
+  let q = ssb;                                       // r = SSB (Sales Bonus)
+  if (Math.abs(q) >= 1) q = q / 100;               // convert % if passed as integer
+  const A = 1 - q;
+  const Kf = (oe / M) * A;
+  if (Kf <= 0) return 0;
 
-  return Math.max(0, (100 * 3600 / V) * adj);
+  // weather only for products 153/154; a=1 (per building level)
+  return Math.max(0, (100 * 3600 / Kf) * adj);
+}
+
+// findRetailOptimal: golden-section search for the sell price that maximises
+// profit, matching cooperinc's j1 → is() optimisation exactly.
+// Returns { optimalPrice, unitsHr, unitsDay, grossRevDay } or null.
+function findRetailOptimal(quality, pd, sat, buyCost, ssb, ao, adj, wageDayBase, pid) {
+  const u = pd.U || 0;                              // production cost
+  if (u <= 0 || (pd.W || 0) <= 0) return null;
+
+  // Price search range (mirrors j1 logic)
+  const l  = pd.W;
+  const c  = pd.V || 0;
+  const qualW = pid === 150 ? 0 : 0.3;
+  const s  = sat;
+  const m  = Math.min(Math.max(2 - s, 0), 2);
+  const h  = Math.max(0.9, m / 2 + 0.5);
+  const f  = l * h;
+  if (f <= 0) return null;
+  const S  = quality * qualW / 12 + 1;
+  const C  = l * (pd.T || 0) + 1;
+  const R_wages = 370 * C * (m / 2) * S + c;       // j1 includes wages in R bound
+
+  let d_min = Math.max(u * 1.01, 0.01);
+  let e_max = u + 2 * R_wages / f;
+  e_max = Math.min(e_max, u * 20);
+  d_min = Math.max(d_min, u * 1.01);
+  if (e_max <= d_min) e_max = u * 3;
+
+  if (buyCost <= 0) return null;
+
+  // Profit at price k — mirrors is()/Xi exactly
+  const aoFactor = Math.abs(ao) >= 1 ? ao / 100 : ao;
+  const wagesAdjDay = wageDayBase * (1 + aoFactor);
+  const profitAt = k => {
+    const uhr = jnRetailUnitsHr(k, quality, pd, sat, ssb, adj, pid);
+    if (uhr <= 0) return -Infinity;
+    return uhr * 24 * (k - buyCost) - wagesAdjDay;
+  };
+
+  // Golden-section search (100 iterations, tolerance 0.01)
+  const GR = (Math.sqrt(5) - 1) / 2;
+  let lo = d_min, hi = e_max;
+  let x1 = hi - GR * (hi - lo),  x2 = lo + GR * (hi - lo);
+  let f1 = profitAt(x1),          f2 = profitAt(x2);
+  for (let i = 0; i < 100 && hi - lo > 0.01; i++) {
+    if (f1 > f2) { hi = x2; x2 = x1; f2 = f1; x1 = hi - GR*(hi-lo); f1 = profitAt(x1); }
+    else         { lo = x1; x1 = x2; f1 = f2; x2 = lo + GR*(hi-lo); f2 = profitAt(x2); }
+  }
+  const optPrice = (lo + hi) / 2;
+  const unitsHr  = jnRetailUnitsHr(optPrice, quality, pd, sat, ssb, adj, pid);
+  if (unitsHr <= 0) return null;
+
+  return {
+    optimalPrice : Math.max(0, optPrice),
+    unitsHr,
+    unitsDay     : unitsHr * 24,
+    grossRevDay  : unitsHr * 24 * optPrice,
+    wagesAdjDay,
+  };
 }
 
 // Map our BLDS retail letter keys → cooperinc buildingID keys (SimCompanies db_letter)
@@ -1472,52 +1539,44 @@ async function fetchRetailData(realm) {
 }
 
 // Returns an array of rows — one per quality tier (Q0-Q12).
-// livePrices[pid][q] = SimCompanies exchange (wholesale) price → BUY COST
-// marketData[pid]['0'].averagePrice = retail sell price; scaled for Q1-Q12 via livePrices ratio
+// Sell price = profit-optimal price (golden-section search, matching cooperinc exactly).
+// Buy cost  = livePrices[pid][q] (SimCompanies exchange / wholesale price).
 function calcRetailProductRows(pid, phase, weather, adj, wageDay, mkt, livePrices, mktData, phaseData) {
   const pd0 = phaseData[pid]?.['0']?.[phase];
   if (!pd0) return [];
-  const sat0       = mktData[pid]?.['0']?.saturation ?? 1;
-  const avgPrice0  = mktData[pid]?.['0']?.averagePrice;
-  const livePrice0 = livePrices[pid]?.['0'] || 0;
-  if (!avgPrice0) return [];   // can't calculate without a reference retail price
+  const sat0 = mktData[pid]?.['0']?.saturation ?? 1;
 
   const name         = PROD[+pid]?.n || `#${pid}`;
   const cpuOwn       = calcCostPerUnit(+pid, mkt);
   const cpuTheory    = theoreticalCostPerUnit(+pid, mkt);
   const selfCpu      = cpuOwn ?? cpuTheory;
   const selfSupplied = cpuOwn !== null;
-  const ao           = getAO() / 100;
-  const ssb          = 1 + getSSB() / 100;
+  const ssb          = getSSB();   // passed as-is; jn divides by 100 if ≥ 1
+  const ao           = getAO();    // passed as-is; findRetailOptimal divides if ≥ 1
 
   const rows = [];
   const exchangePrices = livePrices[pid] || {};
 
   for (const q of Object.keys(exchangePrices).sort((a, b) => +a - +b)) {
-    const buyCost = exchangePrices[q];   // what you pay on the exchange (COGS)
+    const buyCost = exchangePrices[q];   // exchange price = unit cost
     if (!buyCost) continue;
 
-    // Retail sell price: Q0 uses averagePrice directly; Q1-Q12 scale proportionally
-    const sellPrice = +q === 0 || !livePrice0
-      ? avgPrice0
-      : avgPrice0 * (buyCost / livePrice0);
-
-    // Per-quality product data (fall back to Q0 for tiers not in API)
+    // Per-quality product data (Q0 fallback when per-quality absent)
     const pd  = phaseData[pid]?.[q]?.[phase] ?? pd0;
     const sat = mktData[pid]?.[q]?.saturation ?? sat0;
 
-    // Gn demand formula: units/hr depends on sell price (higher price = fewer units)
-    const unitsHr = gnRetailUnitsHr(sellPrice, +q, pd, sat, adj, weather, ao) * ssb;
-    if (unitsHr <= 0) continue;
+    // Find the profit-maximising sell price via golden-section search
+    const opt = findRetailOptimal(+q, pd, sat, buyCost, ssb, ao, adj, wageDay, +pid);
+    if (!opt) continue;
 
-    const unitsDay      = unitsHr * 24;
-    const grossDay      = unitsDay * sellPrice;
-    const mktNetDay     = grossDay - wageDay - unitsDay * buyCost;
-    const selfNetDay    = selfCpu != null ? grossDay - wageDay - unitsDay * selfCpu : null;
+    const { optimalPrice: sellPrice, unitsHr, unitsDay, grossRevDay: grossDay, wagesAdjDay } = opt;
+
+    const mktNetDay     = grossDay - wagesAdjDay - unitsDay * buyCost;
+    const selfNetDay    = selfCpu != null ? grossDay - wagesAdjDay - unitsDay * selfCpu : null;
     const currentNetDay = selfSupplied && selfNetDay != null ? selfNetDay : mktNetDay;
     const rankVal       = selfNetDay ?? mktNetDay;
 
-    rows.push({ pid, quality: +q, name, unitsHr, unitsDay, grossDay, wageDay,
+    rows.push({ pid, quality: +q, name, unitsHr, unitsDay, grossDay, wageDay: wagesAdjDay,
                 sellPrice, cpuMarket: buyCost, selfCpu, selfSupplied,
                 mktNetDay, selfNetDay, currentNetDay, sat, rankVal });
   }
